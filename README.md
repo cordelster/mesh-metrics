@@ -24,11 +24,9 @@ This script allows interfacing directly with a Meshtastic node to poll repeaters
 
 
 
-NOTE: Arguments required are -f <path/device.lst>
-
-                             -p <serial_device>
+NOTE: Arguments required are -f <path/device.lst>  -p <serial_device>
                              
-      With no output directory defined, the script prints to stdout on the screen. 
+   With no output directory defined, the script prints to stdout on the screen. 
 ```sh
 ./mesh-metrics.sh -f dev.lst -p /dev/tty.usbmodem0
 ```
@@ -41,7 +39,7 @@ Device file options:
 Only the NodeID is required to pole nodes though all the commas need to be represented on each line.
 All other fields are optional, though GPS coordinates are needed for the dashboard map to post points.
 
-|NODE ID | CONTACT | PROPERTY NAME | LATITUDE | LOGITUDE |
+|NODE ID | CONTACT | PROPERTY NAME | LATITUDE | LONGITUDE |
 |-----|-----|-----|-----|-----|
 |!2f67c123|Jon Derps|Derp Hill| 21.1234|-122.56789|
 |!2c4354f4|Dan Mann|The man hill|21.254554|-122.56123|
