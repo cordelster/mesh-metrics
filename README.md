@@ -1,6 +1,6 @@
 # mesh_metrics.sh
 # Description
-This script allows interfacing directly with a Meshtastic node to poll repeaters for their status over the mesh network. 
+This script allows interfacing directly with a Meshtastic node to poll repeaters for their status over the mesh network. It only requirees a computer setup with Prometheus or Victoria Metrics, node_exporter (at this time), and a serial connection to a Meshtastic radio. It has no requirment for internet access.
 
 <a href='https://ko-fi.com/L3L0V38OP' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
