@@ -25,7 +25,10 @@ This script allows interfacing directly with a Meshtastic node to poll repeaters
 
 
 NOTE: Arguments required are -f <path/device.lst>
+
                              -p <serial_device>
+                             
+      With no output directory defined, the script prints to stdout on the screen. 
 ```sh
 ./mesh-metrics.sh -f dev.lst -p /dev/tty.usbmodem0
 ```
