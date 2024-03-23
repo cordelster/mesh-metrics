@@ -42,6 +42,8 @@ All other fields are optional, though GPS coordinates are needed for the dashboa
 |!2c4354f4|Dan Mann|The man hill|21.254554|-122.56123|
 
 !2f67c123,Jon Derps,Derp Hill,21.1234,-122.56789
+
 !2c4354f4,Dan Mann,The man hill,21.254554,-122.56123
+
 !56a58b6a,,,,
 
