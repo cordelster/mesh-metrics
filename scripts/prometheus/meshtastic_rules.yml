@@ -1,0 +1,38 @@
+groups:
+- name: Meshtastic
+  rules:
+  - alert: MeshtasticRepeaterBattLow
+    expr: meshtastic_Battery_level < 30
+    for:
+    labels:
+      severity: warning
+    annotations:
+      summary: Meshtastic Battery getting low (instance {{ $labels.instance }})
+      description: "Meshtastic Battery level is getting low.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+  - alert: MeshtasticRepeaterBattCriticalLow
+    expr: meshtastic_Battery_level < 15
+    for:
+    labels:
+      severity: critical
+    annotations:
+      summary: Meshtastic Battery critical low (instance {{ $labels.instance }})
+      description: "Meshtastic Battery level is critical low.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      
+  - alert: MeshtasticRepeaterChannelUtilizationHigh
+    expr: meshtastic_Total_channel_utilization > 60
+    for:
+    labels:
+      severity: warning
+    annotations:
+      summary: Meshtastic Channel utilization is high (instance {{ $labels.instance }})
+      description: "Meshtastic utilization is high.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      
+  - alert: MeshtasticRepeaterChannelUtilizationCritical
+    expr: meshtastic_Total_channel_utilization > 70
+    for:
+    labels:
+      severity: warning
+    annotations:
+      summary: Meshtastic Channel utilization is critically high (instance {{ $labels.instance }})
+      description: "Meshtastic utilization is critically high.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"

@@ -1,0 +1,9 @@
+apiVersion: 1
+
+providers:
+  - name: Meshtastic
+    folder: Meshtastic
+    type: file
+    options:
+      path:
+        /var/lib/grafana/dashboards/meshmetrics

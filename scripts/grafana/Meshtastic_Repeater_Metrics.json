@@ -1,59 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__elements": {},
-  "__requires": [
-    {
-      "type": "panel",
-      "id": "alertlist",
-      "name": "Alert list",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "bargauge",
-      "name": "Bar gauge",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "geomap",
-      "name": "Geomap",
-      "version": ""
-    },
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "10.3.3"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "state-timeline",
-      "name": "State timeline",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "timeseries",
-      "name": "Time series",
-      "version": ""
-    }
-  ],
   "annotations": {
     "list": [
       {
@@ -79,14 +24,13 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": null,
   "links": [],
   "liveNow": false,
   "panels": [
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "mixed",
+        "uid": "-- Mixed --"
       },
       "fieldConfig": {
         "defaults": {
@@ -113,8 +57,7 @@
               }
             ]
           },
-          "unit": "percent",
-          "unitScale": true
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -143,12 +86,12 @@
         "sizing": "auto",
         "valueMode": "color"
       },
-      "pluginVersion": "10.3.3",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "exemplar": false,
@@ -177,6 +120,7 @@
       "id": 14,
       "options": {
         "alertInstanceLabelFilter": "",
+        "alertName": "",
         "dashboardAlerts": false,
         "groupBy": [],
         "groupMode": "default",
@@ -197,8 +141,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "fieldConfig": {
         "defaults": {
@@ -221,8 +165,7 @@
               }
             ]
           },
-          "unit": "percent",
-          "unitScale": true
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -251,17 +194,15 @@
         "sizing": "auto",
         "valueMode": "color"
       },
-      "pluginVersion": "10.3.3",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "exemplar": false,
           "expr": "meshtastic_Total_channel_utilization{instance=\"$node\",job=\"$job\"}",
-          "instant": false,
           "legendFormat": "{{node}}",
           "range": true,
           "refId": "A"
@@ -273,8 +214,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "description": "Requires alertmanager to mark alerting points red.",
       "fieldConfig": {
@@ -299,8 +240,7 @@
               }
             ]
           },
-          "unit": "string",
-          "unitScale": true
+          "unit": "string"
         },
         "overrides": [
           {
@@ -471,82 +411,54 @@
           "zoom": 17
         }
       },
-      "pluginVersion": "10.3.3",
+      "pluginVersion": "10.2.2",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
-          "disableTextWrap": false,
           "editorMode": "code",
-          "exemplar": false,
           "expr": "last_over_time(meshtastic_Latitude{instance=\"$node\",job=\"$job\"}[7d])",
-          "format": "time_series",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "instant": false,
           "legendFormat": "{{node}}",
           "range": true,
-          "refId": "A",
-          "useBackend": false
+          "refId": "A"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
-          "disableTextWrap": false,
           "editorMode": "code",
-          "exemplar": false,
           "expr": "last_over_time(meshtastic_Longitude{instance=\"$node\",job=\"$job\"}[7d])",
-          "format": "time_series",
-          "fullMetaSearch": false,
           "hide": false,
-          "includeNullMetadata": true,
-          "instant": false,
           "legendFormat": "{{node}}",
           "range": true,
-          "refId": "B",
-          "useBackend": false
+          "refId": "B"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
-          "disableTextWrap": false,
           "editorMode": "code",
           "expr": "meshtastic_up{instance=\"$node\",job=\"$job\"}",
-          "format": "time_series",
-          "fullMetaSearch": false,
           "hide": false,
-          "includeNullMetadata": true,
-          "instant": false,
-          "interval": "",
-          "legendFormat": "{{node}}_up",
+          "legendFormat": "{{node}}",
           "range": true,
-          "refId": "C",
-          "useBackend": false
+          "refId": "C"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
-          "disableTextWrap": false,
           "editorMode": "code",
-          "exemplar": false,
           "expr": "ALERTS{instance=\"$node\",job=\"$job\",alertstate=\"firing\"}",
-          "format": "time_series",
-          "fullMetaSearch": false,
           "hide": false,
-          "includeNullMetadata": false,
-          "instant": true,
           "legendFormat": "{{node}}",
-          "range": false,
-          "refId": "D",
-          "useBackend": false
+          "range": true,
+          "refId": "D"
         }
       ],
       "title": "Locations",
@@ -603,13 +515,14 @@
         },
         "viewMode": "list"
       },
-      "title": "Alerts",
+      "title": "Alerts count",
+      "transparent": true,
       "type": "alertlist"
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "fieldConfig": {
         "defaults": {
@@ -671,8 +584,7 @@
                 "value": 1
               }
             ]
-          },
-          "unitScale": true
+          }
         },
         "overrides": []
       },
@@ -702,14 +614,12 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
-          "exemplar": false,
           "expr": "sum (meshtastic_up{instance=\"$node\",job=\"$job\"}) by (node)",
           "hide": false,
-          "instant": false,
-          "legendFormat": "{{node}}",
+          "legendFormat": "__auto",
           "range": true,
           "refId": "A"
         }
@@ -720,8 +630,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "fieldConfig": {
         "defaults": {
@@ -774,8 +684,7 @@
               }
             ]
           },
-          "unit": "percent",
-          "unitScale": true
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -806,7 +715,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "meshtastic_Total_channel_utilization{instance=\"$node\",job=\"$job\"}",
@@ -820,8 +729,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "mixed",
+        "uid": "-- Mixed --"
       },
       "fieldConfig": {
         "defaults": {
@@ -874,8 +783,7 @@
               }
             ]
           },
-          "unit": "percent",
-          "unitScale": true
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -906,7 +814,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "meshtastic_Battery_level{instance=\"$node\",job=\"$job\"}",
@@ -920,8 +828,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "fieldConfig": {
         "defaults": {
@@ -974,8 +882,7 @@
               }
             ]
           },
-          "unit": "percent",
-          "unitScale": true
+          "unit": "percent"
         },
         "overrides": []
       },
@@ -1006,7 +913,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "meshtastic_Transmit_air_utilization{instance=\"$node\",job=\"$job\"}",
@@ -1020,8 +927,8 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
+        "type": "datasource",
+        "uid": "-- Mixed --"
       },
       "fieldConfig": {
         "defaults": {
@@ -1065,8 +972,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1074,8 +980,7 @@
               }
             ]
           },
-          "unit": "volt",
-          "unitScale": true
+          "unit": "volt"
         },
         "overrides": []
       },
@@ -1106,7 +1011,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
+            "uid": "${datasource}"
           },
           "editorMode": "code",
           "expr": "meshtastic_Voltage{instance=\"$node\",job=\"$job\"}",
@@ -1120,7 +1025,7 @@
     }
   ],
   "refresh": "10s",
-  "schemaVersion": 39,
+  "schemaVersion": 38,
   "tags": [
     "Meshtastic"
   ],
@@ -1129,8 +1034,8 @@
       {
         "current": {
           "selected": false,
-          "text": "Prometheus",
-          "value": "WIyb0ajVk"
+          "text": "VictoriaMetrics",
+          "value": "c2c46b27-a78e-43d8-badd-49c62c9e6183"
         },
         "hide": 0,
         "includeAll": false,
@@ -1139,16 +1044,21 @@
         "name": "datasource",
         "options": [],
         "query": "prometheus",
+        "queryValue": "",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
         "type": "datasource"
       },
       {
-        "current": {},
+        "current": {
+          "selected": false,
+          "text": "node_exporter",
+          "value": "node_exporter"
+        },
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
+          "uid": "${datasource}"
         },
         "definition": "label_values(node_uname_info,job)",
         "hide": 0,
@@ -1169,10 +1079,14 @@
         "type": "query"
       },
       {
-        "current": {},
+        "current": {
+          "selected": false,
+          "text": "192.168.120.19:9100",
+          "value": "192.168.120.19:9100"
+        },
         "datasource": {
           "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
+          "uid": "${datasource}"
         },
         "definition": "label_values(node_uname_info{job=\"$job\"},instance)",
         "hide": 0,
@@ -1195,7 +1109,7 @@
     ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {
@@ -1215,6 +1129,6 @@
   "timezone": "",
   "title": "Meshtastic_Repeaters Telemetry",
   "uid": "Z8tUTtTSz",
-  "version": 97,
+  "version": 1,
   "weekStart": ""
 }
