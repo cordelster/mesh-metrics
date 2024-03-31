@@ -13,11 +13,10 @@ groups:
               relativeTimeRange:
                 from: 86400
                 to: 0
-              datasourceUid: WIyb0ajVk
+              datasourceUid: '__expr__'
               model:
                 datasource:
                     type: prometheus
-                    uid: WIyb0ajVk
                 disableTextWrap: false
                 editorMode: code
                 exemplar: false
@@ -97,7 +96,7 @@ groups:
           dashboardUid: Z8tUTtTSz
           panelId: 2
           noDataState: NoData
-          execErrState: Error
+          execErrState: OK
           for: 0s
           annotations:
             __dashboardUid__: Z8tUTtTSz
@@ -115,7 +114,7 @@ groups:
               relativeTimeRange:
                 from: 600
                 to: 0
-              datasourceUid: WIyb0ajVk
+              datasourceUid: '__expr__'
               model:
                 disableTextWrap: false
                 editorMode: builder
@@ -185,8 +184,10 @@ groups:
                 maxDataPoints: 43200
                 refId: C
                 type: threshold
+          dashboardUid: ""
+          panelId: 0
           noDataState: NoData
-          execErrState: Error
+          execErrState: OK
           for: 1h
           labels:
             A: A
@@ -200,11 +201,10 @@ groups:
               relativeTimeRange:
                 from: 10800
                 to: 0
-              datasourceUid: WIyb0ajVk
+              datasourceUid: '__expr__'
               model:
                 datasource:
                     type: prometheus
-                    uid: WIyb0ajVk
                 editorMode: code
                 expr: meshtastic_Total_channel_utilization
                 instant: false
@@ -273,7 +273,7 @@ groups:
           dashboardUid: Z8tUTtTSz
           panelId: 6
           noDataState: NoData
-          execErrState: Error
+          execErrState: OK
           for: 0s
           annotations:
             __dashboardUid__: Z8tUTtTSz
@@ -290,11 +290,10 @@ groups:
               relativeTimeRange:
                 from: 10800
                 to: 0
-              datasourceUid: WIyb0ajVk
+              datasourceUid: '__expr__'
               model:
                 datasource:
                     type: prometheus
-                    uid: WIyb0ajVk
                 disableTextWrap: false
                 editorMode: builder
                 expr: meshtastic_Battery_level
@@ -370,7 +369,7 @@ groups:
           dashboardUid: Z8tUTtTSz
           panelId: 2
           noDataState: NoData
-          execErrState: Error
+          execErrState: OK
           for: 0s
           annotations:
             __dashboardUid__: Z8tUTtTSz
