@@ -32,7 +32,8 @@ groups:
     expr: meshtastic_Total_channel_utilization > 70
     for:
     labels:
-      severity: warning
+      severity: critical
     annotations:
       summary: Meshtastic Channel utilization is critically high (instance {{ $labels.instance }})
       description: "Meshtastic utilization is critically high.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      
