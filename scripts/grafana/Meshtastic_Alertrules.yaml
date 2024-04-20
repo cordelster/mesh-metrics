@@ -13,10 +13,11 @@ groups:
               relativeTimeRange:
                 from: 86400
                 to: 0
-              datasourceUid: '__expr__'
+              datasourceUid: WIyb0ajVk
               model:
                 datasource:
                     type: prometheus
+                    uid: WIyb0ajVk
                 disableTextWrap: false
                 editorMode: code
                 exemplar: false
@@ -95,7 +96,7 @@ groups:
                 type: threshold
           dashboardUid: Z8tUTtTSz
           panelId: 2
-          noDataState: NoData
+          noDataState: OK
           execErrState: OK
           for: 0s
           annotations:
@@ -108,17 +109,17 @@ groups:
           isPaused: false
         - uid: cef803ef-6cc1-49ac-8adc-6dd923a5749f
           title: Repeater extended absence
-          condition: B
+          condition: C
           data:
             - refId: A
               relativeTimeRange:
                 from: 600
                 to: 0
-              datasourceUid: '__expr__'
+              datasourceUid: WIyb0ajVk
               model:
                 disableTextWrap: false
                 editorMode: builder
-                expr: last_over_time(meshtastic_up[2h]) == 0
+                expr: max by(node) (max_over_time(meshtastic_up[2h]))
                 fullMetaSearch: false
                 includeNullMetadata: true
                 instant: true
@@ -165,8 +166,8 @@ groups:
                 conditions:
                     - evaluator:
                         params:
-                            - 0
-                        type: gt
+                            - 1
+                        type: lt
                       operator:
                         type: and
                       query:
@@ -184,11 +185,10 @@ groups:
                 maxDataPoints: 43200
                 refId: C
                 type: threshold
-          dashboardUid: ""
-          panelId: 0
-          noDataState: NoData
+          noDataState: OK
           execErrState: OK
           for: 1h
+          annotations: {}
           labels:
             A: A
             rule_uid: c7f9d6b1-b6a1-4459-82ad-5fa78aceae3a
@@ -201,10 +201,11 @@ groups:
               relativeTimeRange:
                 from: 10800
                 to: 0
-              datasourceUid: '__expr__'
+              datasourceUid: WIyb0ajVk
               model:
                 datasource:
                     type: prometheus
+                    uid: WIyb0ajVk
                 editorMode: code
                 expr: meshtastic_Total_channel_utilization
                 instant: false
@@ -272,7 +273,7 @@ groups:
                 type: threshold
           dashboardUid: Z8tUTtTSz
           panelId: 6
-          noDataState: NoData
+          noDataState: OK
           execErrState: OK
           for: 0s
           annotations:
@@ -290,10 +291,11 @@ groups:
               relativeTimeRange:
                 from: 10800
                 to: 0
-              datasourceUid: '__expr__'
+              datasourceUid: WIyb0ajVk
               model:
                 datasource:
                     type: prometheus
+                    uid: WIyb0ajVk
                 disableTextWrap: false
                 editorMode: builder
                 expr: meshtastic_Battery_level
@@ -357,6 +359,11 @@ groups:
                         params: []
                         type: avg
                       type: query
+                      unloadEvaluator:
+                        params:
+                            - 17
+                            - 0
+                        type: gt
                 datasource:
                     name: Expression
                     type: __expr__
@@ -368,7 +375,7 @@ groups:
                 type: threshold
           dashboardUid: Z8tUTtTSz
           panelId: 2
-          noDataState: NoData
+          noDataState: OK
           execErrState: OK
           for: 0s
           annotations:
@@ -377,5 +384,97 @@ groups:
             description: Meeshtastic battery Level on {{ index $labels "node" }} CRITICAL {{ index $labels "A" }} !
             summary: Meshtastic battery Level on {{ index $labels "node" }} CRITICAL {{ index $labels "A" }}!
           labels:
+            A: A
+          isPaused: false
+        - uid: b482cb23-3b26-4910-85d7-618c0d0ac429
+          title: Channel utilization critical
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 10800
+                to: 0
+              datasourceUid: WIyb0ajVk
+              model:
+                datasource:
+                    type: prometheus
+                    uid: WIyb0ajVk
+                editorMode: code
+                expr: meshtastic_Total_channel_utilization
+                instant: false
+                interval: ""
+                intervalMs: 15000
+                legendFormat: '{{node}}'
+                maxDataPoints: 43200
+                range: true
+                refId: A
+            - refId: B
+              relativeTimeRange:
+                from: 10800
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params: []
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - B
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                reducer: last
+                refId: B
+                type: reduce
+            - refId: C
+              relativeTimeRange:
+                from: 10800
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 80
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: B
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: Z8tUTtTSz
+          panelId: 6
+          noDataState: OK
+          execErrState: OK
+          for: 0s
+          annotations:
+            __dashboardUid__: Z8tUTtTSz
+            __panelId__: "6"
+            description: Channel utilization critical {{ index $labels "node" }}, {{ index $labels "A" }}
+            summary: Channel utilization critical {{ index $labels "node" }}, {{ index $labels "A" }}
+          labels:
+            __legacy_use_channels__: "true"
             A: A
           isPaused: false

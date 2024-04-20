@@ -104,6 +104,18 @@
       "tooltip": "JamBox IT github",
       "type": "link",
       "url": "https://github.com/JamBox-IT/"
+    },
+    {
+      "asDropdown": false,
+      "icon": "doc",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Meshtastic",
+      "tooltip": "",
+      "type": "link",
+      "url": "https://meshtastic.org/docs/introduction/"
     }
   ],
   "liveNow": false,
@@ -891,7 +903,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -990,7 +1003,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1142,7 +1156,7 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "10s",
+  "refresh": "5m",
   "schemaVersion": 39,
   "tags": [
     "Meshtastic"
@@ -1238,6 +1252,6 @@
   "timezone": "",
   "title": "Meshtastic_Repeaters Telemetry",
   "uid": "Z8tUTtTSz",
-  "version": 99,
+  "version": 101,
   "weekStart": ""
 }
