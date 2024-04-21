@@ -19,9 +19,9 @@ groups:
                     type: prometheus
                     uid: WIyb0ajVk
                 disableTextWrap: false
-                editorMode: code
+                editorMode: builder
                 exemplar: false
-                expr: meshtastic_Battery_level
+                expr: last_over_time(meshtastic_Battery_level[2h])
                 format: time_series
                 fullMetaSearch: false
                 includeNullMetadata: true
@@ -298,7 +298,7 @@ groups:
                     uid: WIyb0ajVk
                 disableTextWrap: false
                 editorMode: builder
-                expr: meshtastic_Battery_level
+                expr: last_over_time(meshtastic_Battery_level[1h])
                 fullMetaSearch: false
                 includeNullMetadata: true
                 instant: false
