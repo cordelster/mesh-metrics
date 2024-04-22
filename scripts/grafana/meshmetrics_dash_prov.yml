@@ -4,6 +4,8 @@ providers:
   - name: Meshtastic
     folder: Meshtastic
     type: file
+    updateIntervalSeconds: 300
+    allowUiUpdates: false
     options:
       path:
         /var/lib/grafana/dashboards/Meshtastic
