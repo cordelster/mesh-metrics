@@ -53,4 +53,4 @@ All other fields are optional, though GPS coordinates are needed for the dashboa
 !56a58b6a,,,,
 
 
-
+TODO: Rewrite script in python to leaverage python mmeshtastic.
