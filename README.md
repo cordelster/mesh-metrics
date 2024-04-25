@@ -6,7 +6,13 @@ This script allows interfacing directly with a Meshtastic node to poll repeaters
 
 <a href='https://ko-fi.com/L3L0V38OP' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
+# Requirements:
+- Prometheus/VictoriaMetrics
+- node_exporter
+- Meshtastic_cli
+- Meshtastic client connected via USB
 
+  
 # How to use
 
 
