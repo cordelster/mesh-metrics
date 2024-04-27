@@ -11,6 +11,7 @@ This script allows interfacing directly with a Meshtastic node to poll repeaters
 - node_exporter
 - Meshtastic_cli
 - Meshtastic client connected via USB
+- Prometheus alertmanager, used to change alerting nodes color in the geomap panel (optional).
 
   
 # How to use
