@@ -62,6 +62,9 @@ All other fields are optional, though GPS coordinates are needed for the dashboa
 # Use
 Run via a CRON job at an interval suitable for your network. The larger the network, the dwell time should be increased to keep channel utilization values realistic and not lose metrics.
 
+# Grafana
+The Dashboard geomap plugin can change the point color to red for alerting nodes which requires Prometheus alertmanager to be installed and configured. This requirement is a limitation of the geomap plugin and grafana not having any means to otherwise relay that data, or it's intirely possibile I just have not found how to get that alert data from Grafana into the Geomap plugin... (I'm still searching to reduce any extra dependancies).
+
 TODO:
 - Make make the script run stand alone with interupt and PID.
 - Create Open-RC startup
