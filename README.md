@@ -56,6 +56,14 @@ All other fields are optional, though GPS coordinates are needed for the dashboa
 
 !2c4354f4,Dan Mann,The man hill,21.254554,-122.56123
 
+# Use
+Run via a CRON job at an interval suitable for your network. The larger the network, the dwell time should be increased to keep channel utilization values realistic and not lose metrics.
+
+TODO:
+- Make make the script run stand alone with interupt and PID.
+- Create Open-RC startup
+- Create systemd startup
+
 !56a58b6a,,,,
 
 
