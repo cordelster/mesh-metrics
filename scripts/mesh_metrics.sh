@@ -36,6 +36,7 @@ SSHO=0;
 FORMAT="node_exporter"; 
 PDT=10;
 PORT="/dev/ttyACM0";
+MODE="serial"
 ORPASS="";
 CUSER="";
 EXPECT="/usr/bin/expect";
@@ -56,18 +57,20 @@ Usage: $PROGNAME -f <dev_file> -d <path/folder> [options]...
 
 Options:
 
- -h             This help text.
+  -h            This help text.
 
- -d </Path/to/write/directory>
+  -d </Path/to/write/directory>
                  Path to the directory to output files.
 
- -f </path/to/device_file.lst>
+  -f </path/to/device_file.lst>
                  Input file. If \"-\", stdin will be used instead.
                  
- -i              Make individual files for each node in device list.
+  -i             Make individual files for each node in device list.
 
   -l | -L        Show what will run from the device list.
 
+  -m             Connection mode serial|ip (default- $MODE)
+  
   -o <format>    Output format of written file
                  node_exporter - For ingest by Prometheus node_exoprter.
                  csv - [TODO] Create a comma delimited file.
@@ -91,12 +94,13 @@ __EOF__
 }
 
 
-while getopts "f:o:d:u:hip:P:t:lvL" opt; do
+while getopts "f:o:d:m:u:hip:P:t:lvL" opt; do
 	case $opt in
 		f) DEVFILE="${OPTARG}";;
 		d) DLST="${OPTARG}";;
 		h) usage; exit 0 ;;
 		i) INDIV=1;;
+		m) MODE="${OPTARG}";;
 		o) FORMAT="${OPTARG}";;
 		k) SSHO=1;;
 		l) DOLS=1;;
@@ -213,7 +217,7 @@ case "$TERM" in
 esac;
 
 if [ ! -f $DEVFILE ]; then echo ${DEVFILE} " not found!"; exit 1; fi
-if [ ! -c $PORT ]; then echo ${PORT} " port not found!"; exit 1; fi
+if  [ "$MODE" == "serial" ] && [ ! -c $PORT ]; then echo ${PORT} " port not found!"; exit 1; fi
 if [ ! -x $MESHTASTIC ]; then echo ${MESHTASTIC} " not found!"; exit 1; fi
 
 function promnode() {
@@ -259,6 +263,13 @@ function ocsv() {
 	exit 1
 }
 
+case $MODE in
+	serial) METHOD="--port";;
+	  ip) METHOD="--host";;
+	     :) echo "Option -$OPTARG requires an argument." >&2;exit 1;;
+		\?) echo "Invalid option: -$OPTARG"; usage >&2;exit 1;;
+esac;
+	
     count=0
 function invoke_telem() {
   trap - INT
@@ -289,7 +300,10 @@ function invoke_telem() {
 	NODEFILE=( $( echo $NODE | sed -e 's/\!//g' ) )
     array=()
 	IFS=$'\n'
-    array+=( $(${MESHTASTIC} --port $PORT --request-telemetry --dest $NODE | grep -ahE "${GREPARGS}") );
+    array+=( $(${MESHTASTIC} $METHOD $PORT --request-telemetry --dest $NODE | grep -ahE "${GREPARGS}") );
+    	if [ "${VERB}" -eq 1 ]; then
+    		echo "${MESHTASTIC} $METHOD $PORT --request-telemetry --dest $NODE"
+    	fi
 	if [ ! -z "${array[2]}" ]; then
     	(( count++ ))
     	if [ ! -z $PROP ]; then array+=("Contact: ${PROP}"); fi
