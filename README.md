@@ -7,10 +7,10 @@ This script allows interfacing directly with a Meshtastic node to poll repeaters
 <a href='https://ko-fi.com/L3L0V38OP' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
 
 # Requirements:
-- Prometheus/VictoriaMetrics
+- Prometheus or Victoria Metrics
 - node_exporter
 - Meshtastic_cli
-- Meshtastic client connected via USB
+- Meshtastic client connected via USB or via network.
 - Prometheus alertmanager, used to change alerting nodes color in the geomap panel (optional).
 
   
@@ -23,7 +23,9 @@ This script allows interfacing directly with a Meshtastic node to poll repeaters
 
  -i Create individual metrics file per node.
 
- -p /dev/tyy.usbmodem[0-9]
+ -m [serial | ip] Interface mode. 
+
+ -p /dev/tyy.usbmodem[0-9] | <Host/IP>
 
  -v Output verbose debug info
 
@@ -40,6 +42,10 @@ NOTE: Arguments required are -f <path/device.lst>  -p <serial_device>
 ./mesh-metrics.sh -f dev.lst -p /dev/tty.usbmodem0
 ```
 
+Example using network:
+```
+./mesh-metrics.sh -f dev.lst -p 192.168.1.21 -m ip
+```
 
 
 # Device file
