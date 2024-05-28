@@ -76,7 +76,8 @@ Options:
                  csv - [TODO] Create a comma delimited file.
                  (Default- $FORMAT)
 
-  -p <Device_port> Device serial port. (default- $PORT)
+  -p <Device_port>|<HOST|IP> 
+                 Device serial port, or IP. (default- $PORT)
 
   -P <password>   Password for encrypted device file.
 
