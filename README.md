@@ -39,12 +39,12 @@ NOTE: Arguments required are -f <path/device.lst>  -p <serial_device>
                              
    With no output directory defined, the script prints to stdout on the screen. 
 ```sh
-./mesh-metrics.sh -f dev.lst -p /dev/tty.usbmodem0
+./mesh_metrics.sh -f dev.lst -p /dev/tty.usbmodem0
 ```
 
 Example using network:
 ```
-./mesh-metrics.sh -f dev.lst -p 192.168.1.21 -m ip
+./mesh_metrics.sh -f dev.lst -p 192.168.1.21 -m ip
 ```
 
 
