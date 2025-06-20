@@ -4,6 +4,8 @@ providers:
   - name: Meshtastic
     folder: Meshtastic
     type: file
+    disableDeletion: false
+    editable: false
     updateIntervalSeconds: 300
     allowUiUpdates: false
     options:
