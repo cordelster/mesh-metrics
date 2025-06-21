@@ -87,8 +87,8 @@ fi
 # Install service files
 if command -v systemctl >/dev/null 2>&1; then
     echo "Installing systemd service..."
-    if [ -f "meshmetricsd.service" ]; then
-        cp meshmetricsd.service /etc/systemd/system/
+    if [ -f "init/meshmetricsd.service" ]; then
+        cp init/meshmetricsd.service /etc/systemd/system/
         systemctl daemon-reload
         echo "To enable and start the service:"
         echo "  systemctl enable meshmetricsd.service"
@@ -101,18 +101,18 @@ fi
 # Check for OpenRC (Alpine Linux, Gentoo uses OpenRC)
 if [ -d /etc/init.d ] && ([ -d /etc/conf.d ] || [ "$ALPINE_LINUX" = "1" ]); then
     echo "Installing OpenRC service..."
-    if [ -f "meshmetricsd.init" ]; then
-        cp meshmetricsd.init /etc/init.d/meshmetricsd
+    if [ -f "init/meshmetricsd.init" ]; then
+        cp init/meshmetricsd.init /etc/init.d/meshmetricsd
         chmod 755 /etc/init.d/meshmetricsd
         echo "OpenRC init script installed"
     else
         echo "Warning: meshmetricsd.init not found"
     fi
     
-    if [ -f "meshmetricsd.confd" ]; then
+    if [ -f "init/meshmetricsd.confd" ]; then
         # Alpine Linux doesn't always have /etc/conf.d, create it if needed
         [ ! -d /etc/conf.d ] && mkdir -p /etc/conf.d
-        cp meshmetricsd.confd /etc/conf.d/meshmetricsd
+        cp init/meshmetricsd.confd /etc/conf.d/meshmetricsd
         chmod 644 /etc/conf.d/meshmetricsd
         echo "OpenRC conf.d file installed"
     else
