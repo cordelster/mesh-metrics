@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Meshtastic Telemetry Daemon
+Meshtastic Repeater Telemetry Daemon
 Copyright 2023 Corey DeLasaux <cordelster@gmail.com>
 
 This program is free software: you can redistribute it and/or modify
@@ -20,6 +20,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import argparse
 import csv
 import os
+import pwd
+import grp
 import re
 import sys
 import time
@@ -39,7 +41,7 @@ try:
     import meshtastic.serial_interface
     import meshtastic.tcp_interface
 except ImportError:
-    print("Error: meshtastic package not found. Install with: pip install meshtastic")
+    print("Error: meshtastic package not found. Install with: pip install meshtastic, or your package manager.")
     sys.exit(1)
 
 try:
@@ -56,67 +58,64 @@ VERSION = "MTM-v0.97-Daemon"
 
 class DaemonConfig:
     """Configuration management for the daemon"""
-    
+
     def __init__(self, config_file: str = "/etc/meshtastic-telemetry/meshmetricsd.conf"):
         self.config_file = config_file
         self.config = configparser.ConfigParser()
         self.load_defaults()
         self.load_config()
-    
+
     def load_defaults(self):
         """Load default configuration values"""
         self.config['daemon'] = {
             'poll_interval': '300',  # 5 minutes
-            'log_level': 'INFO',
-            'log_file': '/var/log/meshmetricsd.log',
-            'pid_file': '/var/run/meshmetricsd.pid',
-            'user': 'meshtastic',
-            'group': 'meshtastic'
+            'log_level': 'INFO'
         }
-        
+
         self.config['meshtastic'] = {
             'mode': 'serial',
             'port': '/dev/ttyACM0',
             'dwell_time': '10'
         }
-        
+
         self.config['devices'] = {
             'file': '/etc/meshtastic-telemetry/devices.csv',
             'encrypted': 'false',
             'password_file': ''
         }
-        
+
         self.config['output'] = {
             'directory': '/var/lib/node_exporter/textfile_collector',
             'format': 'node_exporter',
             'individual_files': 'false'
         }
-        
+
         self.config['monitoring'] = {
             'enable_stats': 'true',
             'stats_file': '/var/lib/meshtastic-telemetry/stats.json'
         }
-    
+
     def load_config(self):
         """Load configuration from file"""
         if os.path.exists(self.config_file):
             self.config.read(self.config_file)
-    
+
     def get(self, section: str, key: str, fallback=None):
         """Get configuration value"""
         return self.config.get(section, key, fallback=fallback)
-    
+
     def getint(self, section: str, key: str, fallback=0):
         """Get integer configuration value"""
         return self.config.getint(section, key, fallback=fallback)
-    
+
     def getboolean(self, section: str, key: str, fallback=False):
         """Get boolean configuration value"""
         return self.config.getboolean(section, key, fallback=fallback)
 
 class MeshtasticTelemetryDaemon:
-    def __init__(self, config: DaemonConfig):
+    def __init__(self, config: DaemonConfig, args):
         self.config = config
+        self.args = args
         self.interface = None
         self.running = False
         self.logger = None
@@ -129,77 +128,182 @@ class MeshtasticTelemetryDaemon:
             'nodes_processed': 0,
             'nodes_successful': 0
         }
-        self.setup_logging()
-        
+
+    def drop_privileges(self):
+        """Drop privileges to specified user/group"""
+        if os.getuid() != 0:
+            # Not running as root, can't drop privileges
+            return
+
+        if self.args.group:
+            try:
+                gid = grp.getgrnam(self.args.group).gr_gid
+                os.setgid(gid)
+                self.logger.info(f"Dropped to group: {self.args.group}")
+            except KeyError:
+                self.logger.error(f"Group not found: {self.args.group}")
+                sys.exit(1)
+            except PermissionError:
+                self.logger.error(f"Cannot change to group: {self.args.group}")
+                sys.exit(1)
+
+        if self.args.user:
+            try:
+                uid = pwd.getpwnam(self.args.user).pw_uid
+                os.setuid(uid)
+                self.logger.info(f"Dropped to user: {self.args.user}")
+            except KeyError:
+                self.logger.error(f"User not found: {self.args.user}")
+                sys.exit(1)
+            except PermissionError:
+                self.logger.error(f"Cannot change to user: {self.args.user}")
+                sys.exit(1)
+
     def setup_logging(self):
         """Setup logging configuration"""
         log_level = getattr(logging, self.config.get('daemon', 'log_level', 'INFO'))
-        log_file = self.config.get('daemon', 'log_file', '/var/log/meshmetricsd.log')
         
-        # Create log directory if it doesn't exist
-        log_dir = os.path.dirname(log_file)
-        if log_dir:
-            os.makedirs(log_dir, exist_ok=True)
-        
+        # Use log file from args if provided, otherwise from config
+        log_file = self.args.log_file or self.config.get('daemon', 'log_file')
+
+        handlers = []
+
+        # Add file handler if log file specified
+        if log_file:
+            # Create log directory if it doesn't exist
+            log_dir = os.path.dirname(log_file)
+            if log_dir:
+                os.makedirs(log_dir, exist_ok=True)
+            handlers.append(logging.FileHandler(log_file))
+
+        # Add console handler if running in foreground
+        if self.args.foreground:
+            handlers.append(logging.StreamHandler(sys.stdout))
+
+        if not handlers:
+            # Fallback to console if no other handlers
+            handlers.append(logging.StreamHandler(sys.stdout))
+
         logging.basicConfig(
             level=log_level,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file),
-                logging.StreamHandler(sys.stdout)
-            ]
+            handlers=handlers
         )
         self.logger = logging.getLogger('meshtastic-telemetry')
-    
+
     def write_pid_file(self):
         """Write process ID to PID file"""
-        pid_file = self.config.get('daemon', 'pid_file', '/var/run/meshmetricsd.pid')
-        pid_dir = os.path.dirname(pid_file)
+        if not self.args.pid_file:
+            return
+
+        pid_dir = os.path.dirname(self.args.pid_file)
         if pid_dir:
             os.makedirs(pid_dir, exist_ok=True)
-        
-        with open(pid_file, 'w') as f:
-            f.write(str(os.getpid()))
-    
+
+        try:
+            with open(self.args.pid_file, 'w') as f:
+                f.write(str(os.getpid()))
+            self.logger.debug(f"PID file written: {self.args.pid_file}")
+        except Exception as e:
+            self.logger.error(f"Failed to write PID file {self.args.pid_file}: {e}")
+            sys.exit(1)
+
     def remove_pid_file(self):
         """Remove PID file"""
-        pid_file = self.config.get('daemon', 'pid_file', '/var/run/meshmetricsd.pid')
+        if not self.args.pid_file:
+            return
+
         try:
-            os.unlink(pid_file)
+            os.unlink(self.args.pid_file)
+            self.logger.debug(f"PID file removed: {self.args.pid_file}")
         except FileNotFoundError:
             pass
-    
+        except Exception as e:
+            self.logger.warning(f"Failed to remove PID file: {e}")
+
     def signal_handler(self, signum, frame):
         """Handle shutdown signals"""
         self.logger.info(f"Received signal {signum}, shutting down...")
         self.running = False
-    
+
     def setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown"""
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
-    
+        
+        # Handle SIGHUP for configuration reload
+        if hasattr(signal, 'SIGHUP'):
+            signal.signal(signal.SIGHUP, self.reload_handler)
+
+    def reload_handler(self, signum, frame):
+        """Handle configuration reload signal"""
+        self.logger.info("Received SIGHUP, reloading configuration...")
+        try:
+            self.config.load_config()
+            self.logger.info("Configuration reloaded successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to reload configuration: {e}")
+
+    def daemonize(self):
+        """Daemonize the process (Unix double-fork)"""
+        if self.args.foreground:
+            return
+
+        try:
+            # First fork
+            pid = os.fork()
+            if pid > 0:
+                sys.exit(0)  # Exit parent
+        except OSError as e:
+            self.logger.error(f"First fork failed: {e}")
+            sys.exit(1)
+
+        # Decouple from parent environment
+        os.chdir('/')
+        os.setsid()
+        os.umask(0)
+
+        try:
+            # Second fork
+            pid = os.fork()
+            if pid > 0:
+                sys.exit(0)  # Exit first child
+        except OSError as e:
+            self.logger.error(f"Second fork failed: {e}")
+            sys.exit(1)
+
+        # Redirect standard file descriptors
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+        # Close stdin, stdout, stderr
+        with open(os.devnull, 'r') as f:
+            os.dup2(f.fileno(), sys.stdin.fileno())
+        with open(os.devnull, 'w') as f:
+            os.dup2(f.fileno(), sys.stdout.fileno())
+            os.dup2(f.fileno(), sys.stderr.fileno())
+
     def decrypt_device_file(self, filepath: str, password: str) -> str:
         """Decrypt device file using AES-256-CBC with PBKDF2"""
         if not CRYPTO_AVAILABLE:
             raise ImportError("cryptography package required for decryption. Install with: pip install cryptography")
-        
+
         with open(filepath, 'rb') as f:
             encrypted_data = f.read()
-        
+
         # Decode base64 if the file is base64 encoded
         try:
             encrypted_data = base64.b64decode(encrypted_data)
         except:
             pass  # File might not be base64 encoded
-        
+
         # Extract salt and IV (OpenSSL format: Salted__<salt><encrypted_data>)
         if encrypted_data.startswith(b'Salted__'):
             salt = encrypted_data[8:16]
             encrypted_data = encrypted_data[16:]
         else:
             salt = b'12345678'  # Default salt if not found
-        
+
         # Derive key and IV using PBKDF2
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
@@ -211,32 +315,32 @@ class MeshtasticTelemetryDaemon:
         key_iv = kdf.derive(password.encode())
         key = key_iv[:32]
         iv = key_iv[32:48]
-        
+
         # Decrypt
         cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
         decryptor = cipher.decryptor()
         decrypted_data = decryptor.update(encrypted_data) + decryptor.finalize()
-        
+
         # Remove PKCS7 padding
         padding_length = decrypted_data[-1]
         decrypted_data = decrypted_data[:-padding_length]
-        
+
         return decrypted_data.decode('utf-8')
 
     def parse_device_file(self, filepath: str, password: Optional[str] = None) -> List[Dict]:
         """Parse device file (CSV format) with optional decryption"""
         devices = []
-        
+
         if password:
             content = self.decrypt_device_file(filepath, password)
         else:
             with open(filepath, 'r') as f:
                 content = f.read()
-        
+
         # Remove comments and empty lines
         lines = [line.strip() for line in content.split('\n') 
                 if line.strip() and not line.strip().startswith('#')]
-        
+
         # Parse CSV
         csv_reader = csv.reader(lines)
         for row in csv_reader:
@@ -249,7 +353,7 @@ class MeshtasticTelemetryDaemon:
                     'longitude': row[4].strip() if len(row) > 4 else ''
                 }
                 devices.append(device)
-        
+
         return devices
 
     def connect_to_meshtastic(self) -> bool:
@@ -257,7 +361,7 @@ class MeshtasticTelemetryDaemon:
         try:
             mode = self.config.get('meshtastic', 'mode', 'serial')
             port = self.config.get('meshtastic', 'port', '/dev/ttyACM0')
-            
+
             if mode == "serial":
                 self.interface = meshtastic.serial_interface.SerialInterface(port)
             elif mode == "ip":
@@ -265,10 +369,10 @@ class MeshtasticTelemetryDaemon:
             else:
                 self.logger.error(f"Invalid mode: {mode}")
                 return False
-            
+
             self.logger.info(f"Connected to Meshtastic device via {mode} at {port}")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Failed to connect to Meshtastic device: {e}")
             return False
@@ -277,20 +381,20 @@ class MeshtasticTelemetryDaemon:
         """Request telemetry from a specific node"""
         if not self.interface:
             return {}
-        
+
         try:
             # Convert node_id to integer if it's a hex string
             if node_id.startswith('!'):
                 node_num = int(node_id[1:], 16)
             else:
                 node_num = int(node_id, 16)
-            
+
             # Request telemetry
             telemetry = self.interface.sendText("Request telemetry", destinationId=node_num, wantAck=True)
-            
+
             # Get node info
             node_info = self.interface.nodes.get(node_num, {})
-            
+
             # Extract telemetry data
             telemetry_data = {}
             if 'deviceMetrics' in node_info:
@@ -301,9 +405,9 @@ class MeshtasticTelemetryDaemon:
                     telemetry_data['Voltage'] = metrics['voltage']
                 if 'channelUtilization' in metrics:
                     telemetry_data['utilization'] = metrics['channelUtilization']
-            
+
             return telemetry_data
-            
+
         except Exception as e:
             self.logger.debug(f"Failed to get telemetry from {node_id}: {e}")
             return {}
@@ -311,14 +415,14 @@ class MeshtasticTelemetryDaemon:
     def format_prometheus_output(self, node_id: str, telemetry_data: Dict, device_info: Dict) -> List[str]:
         """Format telemetry data for Prometheus node_exporter"""
         output_lines = []
-        
+
         # Clean node_id for use in metric name
         clean_node_id = node_id.replace('!', '')
-        
+
         # Process telemetry data
         for key, value in telemetry_data.items():
             metric_name = f"meshtastic_{key.lower().replace(' ', '_')}"
-            
+
             # Check if value is numeric
             if isinstance(value, (int, float)) or (isinstance(value, str) and 
                 re.match(r'^[+-]?[0-9]+\.?[0-9]*$', str(value))):
@@ -327,43 +431,43 @@ class MeshtasticTelemetryDaemon:
             else:
                 # String value
                 output_lines.append(f'{metric_name}{{node="{clean_node_id}",str="{value}"}} 1')
-        
+
         # Add device info as metrics
         if device_info.get('contact_name'):
             output_lines.append(f'meshtastic_contact{{node="{clean_node_id}",contact="{device_info["contact_name"]}"}} 1')
-        
+
         if device_info.get('location'):
             output_lines.append(f'meshtastic_location{{node="{clean_node_id}",location="{device_info["location"]}"}} 1')
-        
+
         if device_info.get('latitude'):
             output_lines.append(f'meshtastic_latitude{{node="{clean_node_id}"}} {device_info["latitude"]}')
-        
+
         if device_info.get('longitude'):
             output_lines.append(f'meshtastic_longitude{{node="{clean_node_id}"}} {device_info["longitude"]}')
-        
+
         # Add up metric
         up_value = 1 if telemetry_data else 0
         output_lines.append(f'meshtastic_up{{node="{clean_node_id}",version="{VERSION}"}} {up_value}')
-        
+
         return output_lines
 
     def write_output(self, output_lines: List[str], node_id: str = None):
         """Write output to file(s)"""
         output_dir = self.config.get('output', 'directory')
         individual = self.config.getboolean('output', 'individual_files')
-        
+
         if not output_dir:
             return
-        
+
         # Create output directory if it doesn't exist
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        
+
         if individual and node_id:
             # Individual file for each node
             clean_node_id = node_id.replace('!', '')
             filename = f"meshtastic-{clean_node_id}.prom"
             filepath = Path(output_dir) / filename
-            
+
             with open(filepath, 'w') as f:
                 for line in output_lines:
                     f.write(line + '\n')
@@ -371,7 +475,7 @@ class MeshtasticTelemetryDaemon:
             # Single file for all nodes
             filename = "meshtastic.prom"
             filepath = Path(output_dir) / filename
-            
+
             with open(filepath, 'a') as f:
                 for line in output_lines:
                     f.write(line + '\n')
@@ -382,19 +486,19 @@ class MeshtasticTelemetryDaemon:
         self.stats['total_polls'] += 1
         self.stats['nodes_processed'] += nodes_processed
         self.stats['nodes_successful'] += nodes_successful
-        
+
         if nodes_successful > 0:
             self.stats['successful_polls'] += 1
         else:
             self.stats['failed_polls'] += 1
-        
+
         # Write stats to file if enabled
         if self.config.getboolean('monitoring', 'enable_stats'):
             stats_file = self.config.get('monitoring', 'stats_file')
             stats_dir = os.path.dirname(stats_file)
             if stats_dir:
                 os.makedirs(stats_dir, exist_ok=True)
-            
+
             try:
                 with open(stats_file, 'w') as f:
                     json.dump(self.stats, f, indent=2)
@@ -404,7 +508,7 @@ class MeshtasticTelemetryDaemon:
     def poll_devices(self, devices: List[Dict]):
         """Poll all devices for telemetry"""
         self.logger.info(f"Starting poll of {len(devices)} devices")
-        
+
         # Clear output file if not individual
         if not self.config.getboolean('output', 'individual_files'):
             output_dir = self.config.get('output', 'directory')
@@ -412,58 +516,71 @@ class MeshtasticTelemetryDaemon:
                 filepath = Path(output_dir) / "meshtastic.prom"
                 if filepath.exists():
                     filepath.unlink()
-        
+
         nodes_processed = 0
         nodes_successful = 0
         dwell_time = self.config.getint('meshtastic', 'dwell_time', 10)
-        
+
         for device in devices:
             if not self.running:
                 break
-                
+
             node_id = device['node_id']
             nodes_processed += 1
-            
+
             self.logger.debug(f"Processing node: {node_id}")
-            
+
             # Request telemetry
             telemetry_data = self.request_telemetry(node_id)
-            
+
             if telemetry_data:
                 nodes_successful += 1
                 self.logger.debug(f"Successfully collected telemetry from {node_id}")
             else:
                 self.logger.warning(f"No telemetry data from {node_id}")
-            
+
             # Format output
             output_lines = self.format_prometheus_output(node_id, telemetry_data, device)
-            
+
             # Write output
             self.write_output(output_lines, node_id)
-            
+
             # Wait between requests
             if dwell_time > 0 and self.running:
                 time.sleep(dwell_time)
-        
+
         self.update_stats(nodes_processed, nodes_successful)
         self.logger.info(f"Poll completed: {nodes_successful}/{nodes_processed} nodes successful")
 
     def run(self):
         """Main daemon loop"""
+        # Setup logging first (before daemonization)
+        self.setup_logging()
+
+        # Daemonize if not running in foreground
+        self.daemonize()
+
+        # After daemonization, setup logging again for daemon process
+        if not self.args.foreground:
+            self.setup_logging()
+
         self.logger.info("Starting Meshtastic Telemetry Daemon")
         self.stats['start_time'] = datetime.now().isoformat()
-        
+
         # Setup signal handlers
         self.setup_signal_handlers()
-        
-        # Write PID file
+
+        # Drop privileges if running as root
+        self.drop_privileges()
+
+        # Write PID file after privilege drop
         self.write_pid_file()
-        
+
         try:
             # Load devices
             device_file = self.config.get('devices', 'file')
             password = None
-            
+
             if self.config.getboolean('devices', 'encrypted'):
                 password_file = self.config.get('devices', 'password_file')
                 if password_file and os.path.exists(password_file):
@@ -472,48 +589,48 @@ class MeshtasticTelemetryDaemon:
                 else:
                     self.logger.error("Encrypted device file specified but no password file found")
                     return 1
-            
+
             devices = self.parse_device_file(device_file, password)
             if not devices:
                 self.logger.error("No devices found in device file")
                 return 1
-            
+
             self.logger.info(f"Loaded {len(devices)} devices from {device_file}")
-            
+
             # Connect to Meshtastic
             if not self.connect_to_meshtastic():
                 return 1
-            
+
             # Main polling loop
             self.running = True
             poll_interval = self.config.getint('daemon', 'poll_interval', 300)
-            
+
             self.logger.info(f"Starting polling loop with {poll_interval}s interval")
-            
+
             while self.running:
                 try:
                     self.poll_devices(devices)
-                    
+
                     # Wait for next poll
                     sleep_time = 0
                     while sleep_time < poll_interval and self.running:
                         time.sleep(1)
                         sleep_time += 1
-                        
+
                 except Exception as e:
                     self.logger.error(f"Error during polling: {e}")
                     if self.running:
                         time.sleep(60)  # Wait a minute before retrying
-            
+
         except Exception as e:
             self.logger.error(f"Fatal error: {e}")
             return 1
         finally:
             self.cleanup()
-        
+
         self.logger.info("Daemon shutdown complete")
         return 0
-    
+
     def cleanup(self):
         """Clean up resources"""
         if self.interface:
@@ -528,43 +645,75 @@ def main():
         description='Meshtastic Telemetry Daemon',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    
+
     parser.add_argument('-c', '--config', default='/etc/meshtastic-telemetry/meshmetricsd.conf',
                         help='Configuration file path')
-    
+
     parser.add_argument('-f', '--foreground', action='store_true',
                         help='Run in foreground (don\'t daemonize)')
-    
+
+    parser.add_argument('-p', '--pid-file', metavar='PATH',
+                        help='PID file path (overrides config)')
+
+    parser.add_argument('-l', '--log-file', metavar='PATH',
+                        help='Log file path (overrides config)')
+
+    parser.add_argument('-u', '--user', metavar='USER',
+                        help='User to run as (requires root)')
+
+    parser.add_argument('-g', '--group', metavar='GROUP',
+                        help='Group to run as (requires root)')
+
     parser.add_argument('-t', '--test-config', action='store_true',
                         help='Test configuration and exit')
-    
+
     parser.add_argument('--version', action='version', version=VERSION)
-    
+
     args = parser.parse_args()
-    
+
     # Load configuration
     config = DaemonConfig(args.config)
-    
+
     if args.test_config:
         print("Configuration test:")
         print(f"Config file: {args.config}")
+
+        # Test runtime arguments
+        print("\nRuntime arguments:")
+        if args.pid_file:
+            print(f"  PID file: {args.pid_file}")
+        if args.log_file:
+            print(f"  Log file: {args.log_file}")
+        if args.user:
+            print(f"  User: {args.user}")
+        if args.group:
+            print(f"  Group: {args.group}")
+
+        print("\nConfiguration sections:")
         for section in config.config.sections():
             print(f"[{section}]")
             for key, value in config.config[section].items():
                 print(f"  {key} = {value}")
+
+        # Test device file loading
+        try:
+            device_file = config.get('devices', 'file')
+            if os.path.exists(device_file):
+                daemon = MeshtasticTelemetryDaemon(config, args)
+                devices = daemon.parse_device_file(device_file)
+                print(f"\nDevice file test: Found {len(devices)} devices")
+            else:
+                print(f"\nDevice file test: File not found: {device_file}")
+        except Exception as e:
+            print(f"\nDevice file test: Error - {e}")
+
         print("Configuration OK")
         return 0
-    
+
     # Create daemon instance
-    daemon = MeshtasticTelemetryDaemon(config)
-    
-    if args.foreground:
-        # Run in foreground
-        return daemon.run()
-    else:
-        # Daemonize (simplified - in production you'd use proper daemonization)
-        daemon.logger.info("Starting daemon in background mode")
-        return daemon.run()
+    daemon = MeshtasticTelemetryDaemon(config, args)
+
+    return daemon.run()
 
 if __name__ == "__main__":
     sys.exit(main())
