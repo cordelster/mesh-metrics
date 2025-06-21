@@ -495,13 +495,13 @@ class MeshtasticTelemetryDaemon:
             if 'deviceMetrics' in node_info:
                 metrics = node_info['deviceMetrics']
                 if 'batteryLevel' in metrics:
-                    telemetry_data['Battery'] = metrics['batteryLevel']
+                    telemetry_data['Battery'] = metrics['Battery_level']
                 if 'voltage' in metrics:
-                    telemetry_data['Voltage'] = metrics['voltage']
+                    telemetry_data['Voltage'] = metrics['Voltage']
                 if 'channelUtilization' in metrics:
-                    telemetry_data['utilization'] = metrics['channelUtilization']
+                    telemetry_data['utilization'] = metrics['Total_channel_utilization']
                 if 'airUtilTx' in metrics:
-                    telemetry_data['airtime_tx'] = metrics['airUtilTx']
+                    telemetry_data['airtime_tx'] = metrics['Transmit_air_utilization']
                 if 'uptimeSeconds' in metrics:
                     telemetry_data['uptime'] = metrics['uptimeSeconds']
 
@@ -551,13 +551,13 @@ class MeshtasticTelemetryDaemon:
             output_lines.append(f'meshtastic_contact{{node="{clean_node_id}",contact="{device_info["contact_name"]}"}} 1')
 
         if device_info.get('location'):
-            output_lines.append(f'meshtastic_location{{node="{clean_node_id}",location="{device_info["location"]}"}} 1')
+            output_lines.append(f'meshtastic_Location{{node="{clean_node_id}",location="{device_info["location"]}"}} 1')
 
         if device_info.get('latitude'):
-            output_lines.append(f'meshtastic_latitude{{node="{clean_node_id}"}} {device_info["latitude"]}')
+            output_lines.append(f'meshtastic_Latitude{{node="{clean_node_id}"}} {device_info["latitude"]}')
 
         if device_info.get('longitude'):
-            output_lines.append(f'meshtastic_longitude{{node="{clean_node_id}"}} {device_info["longitude"]}')
+            output_lines.append(f'meshtastic_Longitude{{node="{clean_node_id}"}} {device_info["longitude"]}')
 
         # Add up metric
         up_value = 1 if telemetry_data else 0
