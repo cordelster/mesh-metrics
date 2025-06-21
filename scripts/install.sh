@@ -98,7 +98,7 @@ if command -v systemctl >/dev/null 2>&1; then
     fi
 fi
 
-# Check for OpenRC (Alpine Linux uses OpenRC)
+# Check for OpenRC (Alpine Linux, Gentoo uses OpenRC)
 if [ -d /etc/init.d ] && ([ -d /etc/conf.d ] || [ "$ALPINE_LINUX" = "1" ]); then
     echo "Installing OpenRC service..."
     if [ -f "meshmetricsd.init" ]; then
