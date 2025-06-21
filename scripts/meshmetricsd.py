@@ -531,7 +531,7 @@ class MeshtasticTelemetryDaemon:
         output_lines = []
 
         # Clean node_id for use in metric name
-        clean_node_id = node_id.replace('!', '')
+#         clean_node_id = node_id.replace('!', '')
 
         # Process telemetry data
         for key, value in telemetry_data.items():
