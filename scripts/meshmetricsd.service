@@ -1,0 +1,34 @@
+[Unit]
+Description=Meshtastic Telemetry Repeater Collector Daemon
+Documentation=https://github.com/cordelster/mesh-metrics
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=meshtastic
+Group=meshtastic
+ExecStart=/usr/local/bin/meshmetriicsd -c /etc/meshtastic-telemetry/meshmetricsd.conf
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+RestartSec=30
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/meshmetricsd /var/lib/node_exporter/textfile_collector /var/log
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Process limits
+LimitNOFILE=1024
+LimitNPROC=512
+
+[Install]
+WantedBy=multi-user.target

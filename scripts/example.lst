@@ -1,3 +1,10 @@
+# Meshtastic Device List
+# Format: NodeID,Contact_Name,LOCATION,LATITUDE,LONGITUDE
+# Only NodeID is required, other fields are optional
+
+!12345678,Alice,Home Base,37.7749,-122.4194
+!87654321,Bob,Mobile Unit,37.7849,-122.4094
+!abcdef01,Charlie,Repeater Station,37.7649,-122.4294
 !2c1985fd,Don Fake,Dons Mountain,37.573,-121.608
 !4afc4520,Crazy Bob,Bobs Ranch,37.571,-121.610
 !87651123,Test Failure, False Loc,,

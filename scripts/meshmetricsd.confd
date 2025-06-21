@@ -1,0 +1,14 @@
+# Configuration for Meshtastic Repeater telemetry daemon
+
+# User and group to run the daemon as
+MESHTASTIC_USER="meshtastic"
+MESHTASTIC_GROUP="meshtastic"
+
+# Configuration file path
+MESHTASTIC_CONFIG="/etc/meshtastic-telemetry/meshmetricsd.conf"
+
+# PID file path
+MESHTASTIC_PIDFILE="/var/run/meshmetricsd.pid"
+
+# Log file path
+MESHTASTIC_LOGFILE="/var/log/meshmetricsd.log"

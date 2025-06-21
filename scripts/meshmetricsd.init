@@ -1,0 +1,44 @@
+#!/sbin/openrc-run
+# Copyright 2023 Corey DeLasaux
+# Distributed under the terms of the GNU General Public License v3
+
+name="meshtastic-telemetry"
+description="Meshtastic Telemetry Repeater Collector Daemon"
+
+: ${MESHTASTIC_USER:=meshtastic}
+: ${MESHTASTIC_GROUP:=meshtastic}
+: ${MESHTASTIC_CONFIG:=/etc/meshtastic-telemetry/meshmetricsd.conf}
+: ${MESHTASTIC_PIDFILE:=/var/run/meshmetricsd.pid}
+: ${MESHTASTIC_LOGFILE:=/var/log/meshmetricsd.log}
+
+command="/usr/local/bin/meshmetricsd"
+command_args="-c ${MESHTASTIC_CONFIG}"
+command_user="${MESHTASTIC_USER}:${MESHTASTIC_GROUP}"
+command_background="true"
+pidfile="${MESHTASTIC_PIDFILE}"
+start_stop_daemon_args="--stdout ${MESHTASTIC_LOGFILE} --stderr ${MESHTASTIC_LOGFILE}"
+
+depend() {
+    need net
+    after logger
+}
+
+start_pre() {
+    # Create necessary directories
+    checkpath --directory --owner ${MESHTASTIC_USER}:${MESHTASTIC_GROUP} --mode 0755 \
+        /var/lib/meshmetricsd \
+        /var/lib/node_exporter/textfile_collector \
+        /var/log
+
+    # Check configuration
+    ${command} -c ${MESHTASTIC_CONFIG} --test-config || {
+        eerror "Configuration test failed"
+        return 1
+    }
+}
+
+reload() {
+    ebegin "Reloading ${name}"
+    kill -HUP $(cat ${pidfile}) 2>/dev/null
+    eend $?
+}
