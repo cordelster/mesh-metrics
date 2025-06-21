@@ -8,7 +8,7 @@ description="Meshtastic Telemetry Repeater Collector Daemon"
 : ${MESHTASTIC_USER:=meshtastic}
 : ${MESHTASTIC_GROUP:=meshtastic}
 : ${MESHTASTIC_CONFIG:=/etc/meshtastic-telemetry/meshmetricsd.conf}
-: ${MESHTASTIC_PIDFILE:=/var/run/meshmetricsd.pid}
+: ${MESHTASTIC_PIDFILE:=/run/meshmetricsd.pid}
 : ${MESHTASTIC_LOGFILE:=/var/log/meshmetricsd.log}
 
 command="/usr/local/bin/meshmetricsd"
@@ -24,17 +24,22 @@ depend() {
 }
 
 start_pre() {
+    # Create necessary directories with proper ownership
     checkpath --directory --owner ${MESHTASTIC_USER}:${MESHTASTIC_GROUP} --mode 0755 \
         /var/lib/meshmetricsd \
         /var/lib/node_exporter/textfile_collector \
         /var/log
 
-    checkpath --directory --owner ${MESHTASTIC_USER}:${MESHTASTIC_GROUP} --mode 0755 \
-        "$(dirname ${MESHTASTIC_PIDFILE})"
+    # Remove existing PID file if it exists with wrong ownership
+    if [ -f "${MESHTASTIC_PIDFILE}" ]; then
+        rm -f "${MESHTASTIC_PIDFILE}"
+    fi
     
+    # Create empty PID file with proper ownership
     checkpath --file --owner ${MESHTASTIC_USER}:${MESHTASTIC_GROUP} --mode 0644 \
         "${MESHTASTIC_PIDFILE}"
 
+    # Create log file with proper ownership
     checkpath --file --owner ${MESHTASTIC_USER}:${MESHTASTIC_GROUP} --mode 0644 \
         "${MESHTASTIC_LOGFILE}"
 

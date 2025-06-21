@@ -8,7 +8,7 @@ MESHTASTIC_GROUP="meshtastic"
 MESHTASTIC_CONFIG="/etc/meshtastic-telemetry/meshmetricsd.conf"
 
 # PID file path
-MESHTASTIC_PIDFILE="/var/run/meshmetricsd.pid"
+MESHTASTIC_PIDFILE="/run/meshmetricsd.pid"
 
 # Log file path
 MESHTASTIC_LOGFILE="/var/log/meshmetricsd.log"
