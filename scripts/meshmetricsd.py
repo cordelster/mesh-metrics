@@ -455,7 +455,7 @@ class MeshtasticTelemetryDaemon:
             self.logger.error(f"Failed to connect to Meshtastic device: {e}")
             return False
 
-    def def request_telemetry(self, node_id: str, timeout: int = 30) -> Dict:
+    def request_telemetry(self, node_id: str, timeout: int = 30) -> Dict:
         """Request telemetry from a specific node"""
         if not self.interface:
             return {}
