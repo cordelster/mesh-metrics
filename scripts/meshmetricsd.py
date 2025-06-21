@@ -470,22 +470,18 @@ class MeshtasticTelemetryDaemon:
             # Request telemetry
             self.logger.debug(f"Requesting telemetry from node {node_num:08x}")
             
-            # Send proper telemetry request packet
-            packet = {
-                'to': node_num,
-                'wantResponse': True,
-                'decoded': {
-                    'portnum': portnums_pb2.PortNum.TELEMETRY_APP,
-                    'payload': b'',  # Empty payload for telemetry request
-                    'wantResponse': True
-                }
-            }
-            
-            # Send the packet
-            self.interface.sendData(packet)
+            # Send proper telemetry request using sendData with raw bytes
+            # Create an empty telemetry request (standard way to request telemetry)
+            self.interface.sendData(
+                data=b'',  # Empty payload requests telemetry
+                destinationId=node_num,
+                portNum=portnums_pb2.PortNum.TELEMETRY_APP,
+                wantAck=False,
+                wantResponse=True
+            )
             
             # Wait a bit for response to arrive
-            time.sleep(min(timeout, 10))  # Cap at 10 seconds to avoid blocking too long
+            time.sleep(min(timeout, 15))  # Cap at 15 seconds to avoid blocking too long
             
             # Check if we have fresh telemetry data
             node_info = self.interface.nodes.get(node_num, {})
