@@ -531,8 +531,7 @@ class MeshtasticTelemetryDaemon:
         output_lines = []
 
         # Clean node_id for use in metric name
-#         clean_node_id = node_id.replace('!', '')
-        clean_node_id = node_id
+        clean_node_id = node_id.replace('!', '')
 
         # Process telemetry data
         for key, value in telemetry_data.items():
@@ -542,27 +541,27 @@ class MeshtasticTelemetryDaemon:
             if isinstance(value, (int, float)) or (isinstance(value, str) and 
                 re.match(r'^[+-]?[0-9]+\.?[0-9]*$', str(value))):
                 # Numeric value
-                output_lines.append(f'{metric_name}{{node="{clean_node_id}"}} {value}')
+                output_lines.append(f'{metric_name}{{node="{node_id}"}} {value}')
             else:
                 # String value
-                output_lines.append(f'{metric_name}{{node="{clean_node_id}",str="{value}"}} 1')
+                output_lines.append(f'{metric_name}{{node="{node_id}",str="{value}"}} 1')
 
         # Add device info as metrics
         if device_info.get('contact_name'):
-            output_lines.append(f'meshtastic_contact{{node="{clean_node_id}",contact="{device_info["contact_name"]}"}} 1')
+            output_lines.append(f'meshtastic_contact{{node="{node_id}",contact="{device_info["contact_name"]}"}} 1')
 
         if device_info.get('location'):
-            output_lines.append(f'meshtastic_Location{{node="{clean_node_id}",location="{device_info["location"]}"}} 1')
+            output_lines.append(f'meshtastic_Location{{node="{node_id}",location="{device_info["location"]}"}} 1')
 
         if device_info.get('latitude'):
-            output_lines.append(f'meshtastic_Latitude{{node="{clean_node_id}"}} {device_info["latitude"]}')
+            output_lines.append(f'meshtastic_Latitude{{node="{node_id}"}} {device_info["latitude"]}')
 
         if device_info.get('longitude'):
-            output_lines.append(f'meshtastic_Longitude{{node="{clean_node_id}"}} {device_info["longitude"]}')
+            output_lines.append(f'meshtastic_Longitude{{node="{node_id}"}} {device_info["longitude"]}')
 
         # Add up metric
         up_value = 1 if telemetry_data else 0
-        output_lines.append(f'meshtastic_up{{node="{clean_node_id}",version="{VERSION}"}} {up_value}')
+        output_lines.append(f'meshtastic_up{{node="{node_id}",version="{VERSION}"}} {up_value}')
 
         return output_lines
 
