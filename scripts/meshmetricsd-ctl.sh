@@ -1,5 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 # Control script for Meshtastic Telemetry Daemon
+# Compatible with Alpine Linux (ash shell)
 
 DAEMON_NAME="meshmetricsd"
 CONFIG_FILE="/etc/meshtastic-telemetry/meshmetricsd.conf"
@@ -8,7 +9,7 @@ STATS_FILE="/var/lib/meshtastic-telemetry/stats.json"
 # Detect init system
 if command -v systemctl >/dev/null 2>&1 && systemctl --version >/dev/null 2>&1; then
     INIT_SYSTEM="systemd"
-elif [ -f /sbin/openrc-run ]; then
+elif [ -f /sbin/openrc-run ] || [ -f /sbin/rc-service ]; then
     INIT_SYSTEM="openrc"
 else
     echo "Error: Unsupported init system"
@@ -16,7 +17,7 @@ else
 fi
 
 show_usage() {
-    cat << EOF
+    cat << 'EOF'
 Usage: $0 COMMAND [OPTIONS]
 
 Commands:
@@ -81,7 +82,16 @@ daemon_reload() {
             systemctl reload $DAEMON_NAME.service
             ;;
         openrc)
-            rc-service $DAEMON_NAME reload
+            # OpenRC doesn't have a standard reload, try to send SIGHUP
+            if [ -f "/var/run/$DAEMON_NAME.pid" ]; then
+                kill -HUP "$(cat /var/run/$DAEMON_NAME.pid)" 2>/dev/null || {
+                    echo "Failed to reload, trying restart..."
+                    rc-service $DAEMON_NAME restart
+                }
+            else
+                echo "PID file not found, trying restart..."
+                rc-service $DAEMON_NAME restart
+            fi
             ;;
     esac
 }
@@ -123,17 +133,23 @@ daemon_disable() {
 
 show_logs() {
     local lines=50
-    local follow=false
+    local follow=0
     
-    while [[ $# -gt 0 ]]; do
+    # Parse arguments (ash-compatible)
+    while [ $# -gt 0 ]; do
         case $1 in
             -f|--follow)
-                follow=true
+                follow=1
                 shift
                 ;;
             -n|--lines)
-                lines="$2"
-                shift 2
+                if [ -n "$2" ] && [ "$2" -eq "$2" ] 2>/dev/null; then
+                    lines="$2"
+                    shift 2
+                else
+                    echo "Error: --lines requires a numeric argument"
+                    exit 1
+                fi
                 ;;
             *)
                 echo "Unknown option: $1"
@@ -144,7 +160,7 @@ show_logs() {
     
     case $INIT_SYSTEM in
         systemd)
-            if $follow; then
+            if [ "$follow" = "1" ]; then
                 journalctl -u $DAEMON_NAME.service -f
             else
                 journalctl -u $DAEMON_NAME.service -n $lines
@@ -152,10 +168,15 @@ show_logs() {
             ;;
         openrc)
             local logfile="/var/log/meshtastic-telemetry.log"
-            if $follow; then
-                tail -f "$logfile"
+            if [ -f "$logfile" ]; then
+                if [ "$follow" = "1" ]; then
+                    tail -f "$logfile"
+                else
+                    tail -n $lines "$logfile"
+                fi
             else
-                tail -n $lines "$logfile"
+                echo "Log file not found: $logfile"
+                echo "Check if logging is enabled in the daemon configuration"
             fi
             ;;
     esac
@@ -164,7 +185,17 @@ show_logs() {
 show_stats() {
     if [ -f "$STATS_FILE" ]; then
         echo "Daemon Statistics:"
-        python3 -m json.tool "$STATS_FILE"
+        # Try different JSON tools available on Alpine
+        if command -v jq >/dev/null 2>&1; then
+            jq . "$STATS_FILE"
+        elif command -v python3 >/dev/null 2>&1; then
+            python3 -m json.tool "$STATS_FILE"
+        elif command -v python >/dev/null 2>&1; then
+            python -m json.tool "$STATS_FILE"
+        else
+            echo "JSON formatting tool not found, showing raw content:"
+            cat "$STATS_FILE"
+        fi
     else
         echo "Statistics file not found: $STATS_FILE"
         echo "Make sure the daemon is running and stats are enabled in config"
@@ -173,27 +204,55 @@ show_stats() {
 
 test_config() {
     echo "Testing configuration..."
-    meshtastic-telemetry-daemon -c "$CONFIG_FILE" --test-config
+    if command -v meshmetricsd >/dev/null 2>&1; then
+        meshmetricsd -c "$CONFIG_FILE" --test-config
+    elif [ -x /usr/local/bin/meshmetricsd ]; then
+        /usr/local/bin/meshmetricsd -c "$CONFIG_FILE" --test-config
+    else
+        echo "Error: meshmetricsd executable not found"
+        echo "Make sure the daemon is properly installed"
+        exit 1
+    fi
 }
 
 list_devices() {
     echo "Configured devices:"
     if [ -f "$CONFIG_FILE" ]; then
-        # Extract device file path from config
-        local device_file=$(grep -E "^file\s*=" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d ' ')
-        if [ -f "$device_file" ]; then
+        # Extract device file path from config (ash-compatible)
+        local device_file
+        device_file=$(grep -E "^file[[:space:]]*=" "$CONFIG_FILE" | cut -d'=' -f2 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        
+        if [ -n "$device_file" ] && [ -f "$device_file" ]; then
             echo "Device file: $device_file"
-            echo
+            echo ""
+            printf "%-12s %-20s %-30s %-12s %s\n" "NODE_ID" "CONTACT" "LOCATION" "LATITUDE" "LONGITUDE"
+            printf "%-12s %-20s %-30s %-12s %s\n" "--------" "-------" "--------" "--------" "---------"
+            
+            # Read CSV file (ash-compatible)
             grep -v "^#" "$device_file" | grep -v "^$" | while IFS=, read -r node_id contact location lat lon; do
+                # Remove leading/trailing whitespace
+                node_id=$(echo "$node_id" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                contact=$(echo "$contact" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                location=$(echo "$location" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                lat=$(echo "$lat" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                lon=$(echo "$lon" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                
                 printf "%-12s %-20s %-30s %-12s %s\n" "$node_id" "$contact" "$location" "$lat" "$lon"
             done
         else
-            echo "Device file not found: $device_file"
+            echo "Device file not found or not specified: $device_file"
+            echo "Check the 'file' setting in $CONFIG_FILE"
         fi
     else
         echo "Configuration file not found: $CONFIG_FILE"
     fi
 }
+
+# Validate command line arguments
+if [ $# -eq 0 ]; then
+    show_usage
+    exit 1
+fi
 
 # Main command handling
 case $1 in
@@ -231,7 +290,12 @@ case $1 in
     list-devices)
         list_devices
         ;;
+    -h|--help|help)
+        show_usage
+        ;;
     *)
+        echo "Error: Unknown command '$1'"
+        echo ""
         show_usage
         exit 1
         ;;
