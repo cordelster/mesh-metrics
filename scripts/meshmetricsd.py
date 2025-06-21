@@ -32,6 +32,11 @@ import threading
 import itertools
 import getpass
 import json
+import tempfile
+import shutil
+import urllib.request
+import urllib.parse
+import urllib.error
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
@@ -54,7 +59,7 @@ try:
 except ImportError:
     CRYPTO_AVAILABLE = False
 
-VERSION = "MTM-v0.97-Daemon"
+VERSION = "MTM-v0.98-Daemon"
 
 class DaemonConfig:
     """Configuration management for the daemon"""
@@ -87,7 +92,15 @@ class DaemonConfig:
         self.config['output'] = {
             'directory': '/var/lib/node_exporter/textfile_collector',
             'format': 'node_exporter',
-            'individual_files': 'false'
+            'individual_files': 'false',
+            'atomic_writes': 'true'
+        }
+
+        self.config['prometheus'] = {
+            'push_url': '',
+            'job_name': 'meshtastic_repeater_telemetry',
+            'instance': '',
+            'timeout': '30'
         }
 
         self.config['monitoring'] = {
@@ -112,6 +125,62 @@ class DaemonConfig:
         """Get boolean configuration value"""
         return self.config.getboolean(section, key, fallback=fallback)
 
+class PrometheusExporter:
+    """Handle Prometheus push gateway operations"""
+
+    def __init__(self, config: DaemonConfig, logger):
+        self.config = config
+        self.logger = logger
+        self.push_url = config.get('prometheus', 'push_url', '').strip()
+        self.job_name = config.get('prometheus', 'job_name', 'meshtastic_repeater_telemetry')
+        self.instance = config.get('prometheus', 'instance', '')
+        self.timeout = config.getint('prometheus', 'timeout', 30)
+
+    def push_metrics(self, metrics_data: List[str]) -> bool:
+        """Push metrics to Prometheus push gateway"""
+        if not self.push_url:
+            return True  # No push URL configured, skip silently
+
+        try:
+            # Construct the push URL with job and instance
+            url_parts = [self.push_url.rstrip('/'), 'metrics', 'job', urllib.parse.quote(self.job_name)]
+
+            if self.instance:
+                url_parts.extend(['instance', urllib.parse.quote(self.instance)])
+
+            push_url = '/'.join(url_parts)
+
+            # Prepare the metrics payload
+            payload = '\n'.join(metrics_data) + '\n'
+            payload_bytes = payload.encode('utf-8')
+
+            # Create the HTTP request
+            req = urllib.request.Request(
+                push_url,
+                data=payload_bytes,
+                headers={
+                    'Content-Type': 'text/plain; version=0.0.4; charset=utf-8',
+                    'Content-Length': str(len(payload_bytes))
+                },
+                method='POST'
+            )
+
+            # Send the request
+            with urllib.request.urlopen(req, timeout=self.timeout) as response:
+                if response.status == 200:
+                    self.logger.debug(f"Successfully pushed {len(metrics_data)} metrics to {push_url}")
+                    return True
+                else:
+                    self.logger.error(f"Push gateway returned status {response.status}")
+                    return False
+
+        except urllib.error.URLError as e:
+            self.logger.error(f"Failed to push metrics to {self.push_url}: {e}")
+            return False
+        except Exception as e:
+            self.logger.error(f"Unexpected error pushing metrics: {e}")
+            return False
+
 class MeshtasticTelemetryDaemon:
     def __init__(self, config: DaemonConfig, args):
         self.config = config
@@ -119,6 +188,7 @@ class MeshtasticTelemetryDaemon:
         self.interface = None
         self.running = False
         self.logger = None
+        self.prometheus_exporter = None
         self.stats = {
             'start_time': None,
             'last_poll': None,
@@ -126,7 +196,9 @@ class MeshtasticTelemetryDaemon:
             'successful_polls': 0,
             'failed_polls': 0,
             'nodes_processed': 0,
-            'nodes_successful': 0
+            'nodes_successful': 0,
+            'push_successful': 0,
+            'push_failed': 0
         }
 
     def drop_privileges(self):
@@ -162,7 +234,7 @@ class MeshtasticTelemetryDaemon:
     def setup_logging(self):
         """Setup logging configuration"""
         log_level = getattr(logging, self.config.get('daemon', 'log_level', 'INFO'))
-        
+
         # Use log file from args if provided, otherwise from config
         log_file = self.args.log_file or self.config.get('daemon', 'log_file')
 
@@ -190,6 +262,9 @@ class MeshtasticTelemetryDaemon:
             handlers=handlers
         )
         self.logger = logging.getLogger('meshtastic-telemetry')
+
+        # Initialize Prometheus exporter
+        self.prometheus_exporter = PrometheusExporter(self.config, self.logger)
 
     def write_pid_file(self):
         """Write process ID to PID file"""
@@ -230,7 +305,7 @@ class MeshtasticTelemetryDaemon:
         """Setup signal handlers for graceful shutdown"""
         signal.signal(signal.SIGTERM, self.signal_handler)
         signal.signal(signal.SIGINT, self.signal_handler)
-        
+
         # Handle SIGHUP for configuration reload
         if hasattr(signal, 'SIGHUP'):
             signal.signal(signal.SIGHUP, self.reload_handler)
@@ -240,6 +315,8 @@ class MeshtasticTelemetryDaemon:
         self.logger.info("Received SIGHUP, reloading configuration...")
         try:
             self.config.load_config()
+            # Reinitialize Prometheus exporter with new config
+            self.prometheus_exporter = PrometheusExporter(self.config, self.logger)
             self.logger.info("Configuration reloaded successfully")
         except Exception as e:
             self.logger.error(f"Failed to reload configuration: {e}")
@@ -451,34 +528,113 @@ class MeshtasticTelemetryDaemon:
 
         return output_lines
 
-    def write_output(self, output_lines: List[str], node_id: str = None):
-        """Write output to file(s)"""
+    def write_output_atomic(self, content: str, filepath: Path):
+        """Write content to file atomically using temporary file"""
+        temp_fd = None
+        temp_path = None
+
+        try:
+            # Create temporary file in the same directory as target
+            temp_fd, temp_path = tempfile.mkstemp(
+                suffix='.tmp',
+                prefix=f'.{filepath.name}.',
+                dir=filepath.parent
+            )
+
+            # Write content to temporary file
+            with os.fdopen(temp_fd, 'w') as temp_file:
+                temp_file.write(content)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+
+            temp_fd = None  # File is closed now
+
+            # Atomically move temporary file to target
+            if os.name == 'nt':  # Windows
+                # On Windows, we need to remove the target first
+                if filepath.exists():
+                    filepath.unlink()
+                shutil.move(temp_path, filepath)
+            else:  # Unix-like systems
+                os.rename(temp_path, filepath)
+
+            temp_path = None  # Successfully moved
+            self.logger.debug(f"Atomically wrote file: {filepath}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to write file atomically {filepath}: {e}")
+            # Clean up temporary file if it exists
+            if temp_fd is not None:
+                try:
+                    os.close(temp_fd)
+                except:
+                    pass
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+            raise
+
+    def write_output(self, all_output_lines: List[str]):
+        """Write all collected output to file(s) and optionally push to gateway"""
         output_dir = self.config.get('output', 'directory')
         individual = self.config.getboolean('output', 'individual_files')
+        atomic_writes = self.config.getboolean('output', 'atomic_writes', True)
 
-        if not output_dir:
-            return
+        # Write to files if output directory is configured
+        if output_dir:
+            # Create output directory if it doesn't exist
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
 
-        # Create output directory if it doesn't exist
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+            if individual:
+                # Group output lines by node for individual files
+                node_outputs = {}
+                for line in all_output_lines:
+                    # Extract node from metric line
+                    match = re.search(r'node="([^"]+)"', line)
+                    if match:
+                        node_id = match.group(1)
+                        if node_id not in node_outputs:
+                            node_outputs[node_id] = []
+                        node_outputs[node_id].append(line)
 
-        if individual and node_id:
-            # Individual file for each node
-            clean_node_id = node_id.replace('!', '')
-            filename = f"meshtastic-{clean_node_id}.prom"
-            filepath = Path(output_dir) / filename
+                # Write individual files
+                for node_id, lines in node_outputs.items():
+                    filename = f"meshtastic-{node_id}.prom"
+                    filepath = Path(output_dir) / filename
+                    content = '\n'.join(lines) + '\n'
 
-            with open(filepath, 'w') as f:
-                for line in output_lines:
-                    f.write(line + '\n')
-        else:
-            # Single file for all nodes
-            filename = "meshtastic.prom"
-            filepath = Path(output_dir) / filename
+                    try:
+                        if atomic_writes:
+                            self.write_output_atomic(content, filepath)
+                        else:
+                            with open(filepath, 'w') as f:
+                                f.write(content)
+                    except Exception as e:
+                        self.logger.error(f"Failed to write individual file {filepath}: {e}")
+            else:
+                # Single file for all nodes
+                filename = "meshtastic.prom"
+                filepath = Path(output_dir) / filename
+                content = '\n'.join(all_output_lines) + '\n'
 
-            with open(filepath, 'a') as f:
-                for line in output_lines:
-                    f.write(line + '\n')
+                try:
+                    if atomic_writes:
+                        self.write_output_atomic(content, filepath)
+                    else:
+                        with open(filepath, 'w') as f:
+                            f.write(content)
+                except Exception as e:
+                    self.logger.error(f"Failed to write output file {filepath}: {e}")
+
+        # Push to Prometheus gateway if configured
+        if self.prometheus_exporter.push_url:
+            if self.prometheus_exporter.push_metrics(all_output_lines):
+                self.stats['push_successful'] += 1
+                self.logger.debug("Successfully pushed metrics to Prometheus gateway")
+            else:
+                self.stats['push_failed'] += 1
 
     def update_stats(self, nodes_processed: int, nodes_successful: int):
         """Update daemon statistics"""
@@ -509,17 +665,10 @@ class MeshtasticTelemetryDaemon:
         """Poll all devices for telemetry"""
         self.logger.info(f"Starting poll of {len(devices)} devices")
 
-        # Clear output file if not individual
-        if not self.config.getboolean('output', 'individual_files'):
-            output_dir = self.config.get('output', 'directory')
-            if output_dir:
-                filepath = Path(output_dir) / "meshtastic.prom"
-                if filepath.exists():
-                    filepath.unlink()
-
         nodes_processed = 0
         nodes_successful = 0
         dwell_time = self.config.getint('meshtastic', 'dwell_time', 10)
+        all_output_lines = []
 
         for device in devices:
             if not self.running:
@@ -541,13 +690,15 @@ class MeshtasticTelemetryDaemon:
 
             # Format output
             output_lines = self.format_prometheus_output(node_id, telemetry_data, device)
-
-            # Write output
-            self.write_output(output_lines, node_id)
+            all_output_lines.extend(output_lines)
 
             # Wait between requests
             if dwell_time > 0 and self.running:
                 time.sleep(dwell_time)
+
+        # Write all collected data after polling is complete
+        if all_output_lines:
+            self.write_output(all_output_lines)
 
         self.update_stats(nodes_processed, nodes_successful)
         self.logger.info(f"Poll completed: {nodes_successful}/{nodes_processed} nodes successful")
@@ -606,6 +757,8 @@ class MeshtasticTelemetryDaemon:
             poll_interval = self.config.getint('daemon', 'poll_interval', 300)
 
             self.logger.info(f"Starting polling loop with {poll_interval}s interval")
+            if self.prometheus_exporter.push_url:
+                self.logger.info(f"Prometheus push gateway configured: {self.prometheus_exporter.push_url}")
 
             while self.running:
                 try:
