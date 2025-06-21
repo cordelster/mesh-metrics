@@ -45,6 +45,7 @@ try:
     import meshtastic
     import meshtastic.serial_interface
     import meshtastic.tcp_interface
+    from meshtastic import portnums_pb2, telemetry_pb2
 except ImportError:
     print("Error: meshtastic package not found. Install with: pip install meshtastic, or your package manager.")
     sys.exit(1)
@@ -454,7 +455,7 @@ class MeshtasticTelemetryDaemon:
             self.logger.error(f"Failed to connect to Meshtastic device: {e}")
             return False
 
-    def request_telemetry(self, node_id: str) -> Dict:
+    def def request_telemetry(self, node_id: str, timeout: int = 30) -> Dict:
         """Request telemetry from a specific node"""
         if not self.interface:
             return {}
@@ -467,10 +468,31 @@ class MeshtasticTelemetryDaemon:
                 node_num = int(node_id, 16)
 
             # Request telemetry
-            telemetry = self.interface.sendText("Request telemetry", destinationId=node_num, wantAck=True)
-
-            # Get node info
+            self.logger.debug(f"Requesting telemetry from node {node_num:08x}")
+            
+            # Send proper telemetry request packet
+            packet = {
+                'to': node_num,
+                'wantResponse': True,
+                'decoded': {
+                    'portnum': portnums_pb2.PortNum.TELEMETRY_APP,
+                    'payload': b'',  # Empty payload for telemetry request
+                    'wantResponse': True
+                }
+            }
+            
+            # Send the packet
+            self.interface.sendData(packet)
+            
+            # Wait a bit for response to arrive
+            time.sleep(min(timeout, 10))  # Cap at 10 seconds to avoid blocking too long
+            
+            # Check if we have fresh telemetry data
             node_info = self.interface.nodes.get(node_num, {})
+            
+            # Also check the nodedb for updated info
+            if hasattr(self.interface, 'nodesByNum') and node_num in self.interface.nodesByNum:
+                node_info = self.interface.nodesByNum[node_num]
 
             # Extract telemetry data
             telemetry_data = {}
@@ -482,6 +504,25 @@ class MeshtasticTelemetryDaemon:
                     telemetry_data['Voltage'] = metrics['voltage']
                 if 'channelUtilization' in metrics:
                     telemetry_data['utilization'] = metrics['channelUtilization']
+                if 'airUtilTx' in metrics:
+                    telemetry_data['airtime_tx'] = metrics['airUtilTx']
+                if 'uptimeSeconds' in metrics:
+                    telemetry_data['uptime'] = metrics['uptimeSeconds']
+
+            # Check for environment metrics
+            if 'environmentMetrics' in node_info:
+                env_metrics = node_info['environmentMetrics']
+                if 'temperature' in env_metrics:
+                    telemetry_data['temperature'] = env_metrics['temperature']
+                if 'relativeHumidity' in env_metrics:
+                    telemetry_data['humidity'] = env_metrics['relativeHumidity']
+                if 'barometricPressure' in env_metrics:
+                    telemetry_data['pressure'] = env_metrics['barometricPressure']
+            
+            if telemetry_data:
+                self.logger.debug(f"Collected telemetry from {node_id}: {list(telemetry_data.keys())}")
+            else:
+                self.logger.debug(f"No telemetry data available for {node_id}")
 
             return telemetry_data
 
@@ -680,7 +721,7 @@ class MeshtasticTelemetryDaemon:
             self.logger.debug(f"Processing node: {node_id}")
 
             # Request telemetry
-            telemetry_data = self.request_telemetry(node_id)
+            telemetry_data = self.request_telemetry(node_id, dwell_time)
 
             if telemetry_data:
                 nodes_successful += 1
