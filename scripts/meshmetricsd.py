@@ -495,13 +495,13 @@ class MeshtasticTelemetryDaemon:
             if 'deviceMetrics' in node_info:
                 metrics = node_info['deviceMetrics']
                 if 'batteryLevel' in metrics:
-                    telemetry_data['Battery'] = metrics['Battery_level']
+                    telemetry_data['Battery_level'] = metrics['batteryLevel']
                 if 'voltage' in metrics:
-                    telemetry_data['Voltage'] = metrics['Voltage']
+                    telemetry_data['Voltage'] = metrics['voltage']
                 if 'channelUtilization' in metrics:
-                    telemetry_data['utilization'] = metrics['Total_channel_utilization']
+                    telemetry_data['Total_channel_utilization'] = metrics['channelUtilization']
                 if 'airUtilTx' in metrics:
-                    telemetry_data['airtime_tx'] = metrics['Transmit_air_utilization']
+                    telemetry_data['Transmit_air_utilization'] = metrics['airUtilTx']
                 if 'uptimeSeconds' in metrics:
                     telemetry_data['uptime'] = metrics['uptimeSeconds']
 
