@@ -24,11 +24,19 @@ depend() {
 }
 
 start_pre() {
-    # Create necessary directories
     checkpath --directory --owner ${MESHTASTIC_USER}:${MESHTASTIC_GROUP} --mode 0755 \
         /var/lib/meshmetricsd \
         /var/lib/node_exporter/textfile_collector \
         /var/log
+
+    checkpath --directory --owner ${MESHTASTIC_USER}:${MESHTASTIC_GROUP} --mode 0755 \
+        "$(dirname ${MESHTASTIC_PIDFILE})"
+    
+    checkpath --file --owner ${MESHTASTIC_USER}:${MESHTASTIC_GROUP} --mode 0644 \
+        "${MESHTASTIC_PIDFILE}"
+
+    checkpath --file --owner ${MESHTASTIC_USER}:${MESHTASTIC_GROUP} --mode 0644 \
+        "${MESHTASTIC_LOGFILE}"
 
     # Check configuration
     ${command} -c ${MESHTASTIC_CONFIG} --test-config || {
