@@ -12,9 +12,9 @@ These scripts are for special scenarios, as most should be running one of the cl
 # meshmetricsd.py
 
 This python script imports meshtastic-cli python functions which allows for more versatility.
-It has all of the same functions as the bash script, though it's been extended with several features and requires a configuration file inn addition to the node list, this way you may still encrypt the node list, and simplifies runs.
+It has all of the same functions as the bash script, though it's been extended with several features and requires a configuration file in addition to the node list, this way you may still encrypt the node list, and simplifies runs.
 
-##🔍 Features added ontop of what is available in the bash script:
+## 🔍 Features added ontop of what is available in the bash script:
 - daemon mode - works with openRC or systemd (optional)
 - Atomic prometheus file writes (optional)
 - Write individual files per node, or one file.
@@ -53,7 +53,7 @@ optional arguments:
 ```
 
 
-#✨ mesh_metrics.sh_
+# ✨ mesh_metrics.sh_
 ## Requirements:
 - Prometheus or Victoria Metrics
 - node_exporter
