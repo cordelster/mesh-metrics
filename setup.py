@@ -53,7 +53,6 @@ setup(
         "Operating System :: Microsoft :: Windows",
     ],
     python_requires=">=3.7",
-    install_requires=read_requirements(),
     extras_require={
         'dev': [
             'pytest>=6.0',
