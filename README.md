@@ -53,11 +53,9 @@ optional arguments:
 ```
 
 
-<<<<<<< HEAD
+
 # ✨ mesh_metrics.sh
-=======
-# ✨ mesh_metrics.sh_
->>>>>>> bc4299845a23ebd7144d6850ab011e91e1b81c39
+
 ## Requirements:
 - Prometheus or Victoria Metrics
 - node_exporter
