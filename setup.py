@@ -68,8 +68,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'meshmetricsd=meshtastic-repeater-telemetry-daemon.meshmetricsd:main',
-            'meshtastic-repeater-telemetry-daemon=meshtastic_telemetry.meshmetricsd:main',
+            'meshmetricsd=mesh-metricsd.meshmetricsd:main',
+            'meshtastic-repeater-telemetry-daemon=mesh-metricsd.meshmetricsd:main',
         ],
     },
     data_files=[
@@ -85,10 +85,10 @@ setup(
         ],
     },
     zip_safe=False,
-    keywords="meshtastic telemetry monitoring prometheus daemon",
+    keywords="meshtastic repeater telemetry monitoring prometheus daemon",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/meshtastic-telemetry-daemon/issues",
-        "Source": "https://github.com/yourusername/meshtastic-telemetry-daemon",
-        "Documentation": "https://github.com/yourusername/meshtastic-telemetry-daemon/blob/main/README.md",
+        "Bug Reports": "https://github.com/cordelster/mesh-metrics/issues",
+        "Source": "https://github.com/cordelster/mesh-metrics",
+        "Documentation": "https://github.com/cordelster/mesh-metrics/blob/main/README.md",
     },
 )
