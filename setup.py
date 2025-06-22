@@ -68,8 +68,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'meshmetricsd=mesh-metricsd.meshmetricsd:main',
-            'meshtastic-repeater-telemetry-daemon=mesh-metricsd.meshmetricsd:main',
+            'meshmetricsd=mesh_metricsd.meshmetricsd:main',
+            'meshtastic-repeater-telemetry-daemon=mesh_metricsd.meshmetricsd:main',
         ],
     },
     data_files=[

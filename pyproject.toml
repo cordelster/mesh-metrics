@@ -3,7 +3,7 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "meshtastic-telemetry-daemon"
+name = "meshtastic-repeater-telemetry-daemon"
 version = "0.98.0"
 dynamic = ["keywords"]
 description = "A daemon for collecting and exporting Meshtastic repeater node telemetry data"
@@ -40,8 +40,8 @@ dev = [
 ]
 
 [project.scripts]
-meshmetricsd = "mesh-metricsd.meshmetricsd:main"
-meshtastic-repeater-telemetry-daemon = "mesh-metricsd.meshmetricsd:main"
+meshmetricsd = "mesh_metricsd.meshmetricsd:main"
+meshtastic-repeater-telemetry-daemon = "mesh_metricsd.meshmetricsd:main"
 
 [project.urls]
 Homepage = "https://github.com/cordelster/mesh-metrics"
