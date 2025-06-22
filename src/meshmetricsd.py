@@ -38,6 +38,7 @@ import urllib.request
 import urllib.parse
 import urllib.error
 from pathlib import Path
+from meshmetricsd.version import __version__  # noqa: F401
 from lib.prometheus_manager import PrometheusManager
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
