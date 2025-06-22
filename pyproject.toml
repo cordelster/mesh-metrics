@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "meshtastic-telemetry-daemon"
 version = "0.98.0"
 dynamic = ["keywords"]
-description = "A daemon for collecting and exporting Meshtastic node telemetry data"
+description = "A daemon for collecting and exporting Meshtastic repeater node telemetry data"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
 authors = [
@@ -24,7 +24,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 dependencies = [
     "meshtastic>=2.0.0",
     "cryptography>=3.0.0",
@@ -40,8 +40,8 @@ dev = [
 ]
 
 [project.scripts]
-meshmetricsd = "meshtastic_telemetry.meshmetricsd:main"
-meshtastic-telemetry-daemon = "meshtastic_telemetry.meshmetricsd:main"
+meshmetricsd = "mesh-metricsd.meshmetricsd:main"
+meshtastic-repeater-telemetry-daemon = "mesh-metricsd.meshmetricsd:main"
 
 [project.urls]
 Homepage = "https://github.com/cordelster/mesh-metrics"
