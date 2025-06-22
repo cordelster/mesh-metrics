@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "meshtastic-telemetry-daemon"
 version = "0.98.0"
+dynamic = ["keywords"]
 description = "A daemon for collecting and exporting Meshtastic node telemetry data"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}

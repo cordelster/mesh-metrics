@@ -12,7 +12,7 @@ def read_readme():
         with open('README.md', 'r', encoding='utf-8') as f:
             return f.read()
     except FileNotFoundError:
-        return "Meshtastic Telemetry Daemon - A daemon for collecting and exporting Meshtastic node telemetry data"
+        return "Meshtastic-repeater-telemetry-daemon - A daemon for collecting and exporting Meshtastic node telemetry data"
 
 # Read requirements from requirements.txt
 def read_requirements():
@@ -26,14 +26,14 @@ def read_requirements():
         ]
 
 setup(
-    name="meshtastic-telemetry-daemon",
+    name="meshtastic-repeater-telemetry-daemon",
     version="0.98.0",
     author="Corey DeLasaux",
     author_email="cordelster@gmail.com",
-    description="A daemon for collecting and exporting Meshtastic node telemetry data",
+    description="A daemon for collecting and exporting Meshtastic repeater node telemetry data",
     long_description=read_readme(),
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/meshtastic-telemetry-daemon",  # Update with your repo
+    url="https://github.com/cordelster/mesh-metrics",  # Update with your repo
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     classifiers=[
@@ -68,8 +68,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'meshmetricsd=meshtastic_telemetry.meshmetricsd:main',
-            'meshtastic-telemetry-daemon=meshtastic_telemetry.meshmetricsd:main',
+            'meshmetricsd=meshtastic-repeater-telemetry-daemon.meshmetricsd:main',
+            'meshtastic-repeater-telemetry-daemon=meshtastic_telemetry.meshmetricsd:main',
         ],
     },
     data_files=[

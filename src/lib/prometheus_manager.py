@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Prometheus Manager for Meshtastic Telemetry
+Prometheus Manager for Meshtastic Repeater Telemetry
 Handles Prometheus metrics formatting, file operations, and push gateway operations
 """
 

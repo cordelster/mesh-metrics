@@ -11,7 +11,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 from .version import __version__
 
-__author__ = "Corey DeLasaux"
+__author__ = "Corey De Lasaux"
 __email__ = "cordelster@gmail.com"
 __license__ = "GPL v3+"
 
