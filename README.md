@@ -113,6 +113,33 @@ Example using network:
 ## Use
 Run via a CRON job at an interval suitable for your network. The larger the network, the dwell time should be increased to keep channel utilization values realistic and not lose metrics.
 
+## New Command Line Options Added:
+
+-H <URL>: HTTP endpoint to POST metrics to (e.g., http://pushgateway:9091/metrics/job/meshtastic)
+-T <seconds>: HTTP timeout for curl requests (default: 10 seconds)
+-A <header>: Additional HTTP headers (can be used multiple times for auth, etc.)
+
+### Key Features:
+
+Independent of File Options: The HTTP posting works completely independently of the file writing (-d, -i options)
+Per-Node Posting: Metrics are sent immediately after each node collection completes or fails
+Proper Prometheus Format: Sends metrics with the correct Content-Type header for Prometheus exposition format
+Error Handling: Includes timeout handling and verbose logging for debugging
+Custom Headers: Support for authentication headers like Authorization: Bearer token
+
+### Usage Examples:
+```
+# Send to Prometheus Pushgateway
+./mesh_metrics.sh -f devices.lst -H "http://pushgateway:9091/metrics/job/meshtastic"
+
+# With authentication and custom timeout
+./mesh_metrics.sh -f devices.lst -H "https://api.example.com/metrics" \
+  -A "Authorization: Bearer abc123" -T 30
+
+# Combined with file output (both happen independently)
+./mesh_metrics.sh -f devices.lst -d /var/lib/prometheus \
+  -H "http://pushgateway:9091/metrics/job/meshtastic"
+```
 
 # Device file
 
