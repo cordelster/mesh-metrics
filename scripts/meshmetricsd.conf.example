@@ -1,0 +1,60 @@
+[daemon]
+# Polling interval in seconds (default: 300 = 5 minutes)
+poll_interval = 300
+
+# Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_level = INFO
+
+# Log file path
+log_file = /var/log/meshmetricsd.log
+
+# PID file path
+pid_file = /var/run/meshmetricsd.pid
+
+# User and group to run as (create these if they don't exist)
+user = meshtastic
+group = meshtastic
+
+[meshtastic]
+# Connection mode: serial or ip
+mode = serial
+
+# Device port (for serial) or IP address (for ip mode)
+port = /dev/ttyACM0
+
+# Time to wait between polling individual nodes (seconds)
+dwell_time = 10
+
+[devices]
+# Path to devices CSV file
+file = /etc/meshtastic-telemetry/devices.csv
+
+# Whether the device file is encrypted
+encrypted = false
+
+# Path to password file (if encrypted = true)
+password_file = /etc/meshtastic-telemetry/password
+
+[output]
+# Output directory for metrics files
+directory = /var/lib/node_exporter/textfile_collector
+
+# Output format (currently only node_exporter supported)
+format = node_exporter
+
+# Create individual files for each node (true) or single file (false)
+individual_files = true
+
+[prometheus]
+## Prometheus exposition push (each optional, Defaults shown)
+# push_url = http://192.168.1.6:8428/api/v1/import/prometheus
+# job_name = meshtastic_repeater_telemetry
+# instance = ''
+# timeout = 30
+
+[monitoring]
+# Enable daemon statistics collection
+enable_stats = true
+
+# Path to statistics file
+stats_file = /var/lib/meshmetricsd/stats.json
