@@ -34,8 +34,8 @@ setup(
     long_description=read_readme(),
     long_description_content_type="text/markdown",
     url="https://github.com/cordelster/mesh-metrics",  # Update with your repo
-    packages=find_packages(where="src"),
-    package_dir={"": "src"},
+    packages=find_packages(where="mesh_metricsd"),
+    package_dir={"": "mesh_metricsd"},
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: System Administrators",
