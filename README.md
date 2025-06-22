@@ -120,9 +120,13 @@ Run via a CRON job at an interval suitable for your network. The larger the netw
 ### Key Features:
 
 Independent of File Options: The HTTP posting works completely independently of the file writing (-d, -i options)
+
 Per-Node Posting: Metrics are sent immediately after each node collection completes or fails
+
 Proper Prometheus Format: Sends metrics with the correct Content-Type header for Prometheus exposition format
+
 Error Handling: Includes timeout handling and verbose logging for debugging
+
 Custom Headers: Support for authentication headers like Authorization: Bearer token
 
 ### Usage Examples:
