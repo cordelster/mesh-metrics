@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meshtastic-telemetry-daemon"
+version = "0.98.0"
+description = "A daemon for collecting and exporting Meshtastic node telemetry data"
+readme = "README.md"
+license = {text = "GPL-3.0-or-later"}
+authors = [
+    {name = "Corey DeLasaux", email = "cordelster@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: System Administrators",
+    "Topic :: System :: Monitoring",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.7"
+dependencies = [
+    "meshtastic>=2.0.0",
+    "cryptography>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "flake8",
+    "black",
+    "mypy",
+]
+
+[project.scripts]
+meshmetricsd = "meshtastic_telemetry.meshmetricsd:main"
+meshtastic-telemetry-daemon = "meshtastic_telemetry.meshmetricsd:main"
+
+[project.urls]
+Homepage = "https://github.com/cordelster/mesh-metrics"
+Repository = "https://github.com/cordelster/mesh-metrics"
+Issues = "https://github.com/cordelster/mesh-metrics/issues"

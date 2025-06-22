@@ -1,0 +1,8 @@
+pytest>=6.0
+pytest-cov
+flake8
+black
+mypy
+wheel
+twine
+
