@@ -73,14 +73,14 @@ setup(
     },
     data_files=[
         ('etc/meshtastic-telemetry', ['config/meshmetricsd.conf.example']),
-        ('etc/systemd/system', ['systemd/meshmetricsd.service']),
-        ('usr/share/doc/meshtastic-telemetry-daemon', ['README.md', 'LICENSE']),
+#         ('etc/systemd/system', ['systemd/meshmetricsd.service']),
+#         ('usr/share/doc/meshtastic-telemetry-daemon', ['README.md', 'LICENSE']),
     ],
     include_package_data=True,
     package_data={
         'meshtastic_telemetry': [
             'config/*.conf',
-            'systemd/*.service',
+#             'systemd/*.service',
         ],
     },
     zip_safe=False,
