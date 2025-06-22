@@ -53,7 +53,11 @@ optional arguments:
 ```
 
 
+<<<<<<< HEAD
+# ✨ mesh_metrics.sh
+=======
 # ✨ mesh_metrics.sh_
+>>>>>>> bc4299845a23ebd7144d6850ab011e91e1b81c39
 ## Requirements:
 - Prometheus or Victoria Metrics
 - node_exporter
@@ -63,22 +67,35 @@ optional arguments:
 
   
 ## How to use
-
-
- -f </path/devfile.lst> Device list
-
- -d </path/to/node_exporter/folder>
-
- -i Create individual metrics file per node.
-
- -m [serial | ip] Interface mode. 
-
- -p /dev/tyy.usbmodem[0-9] | <Host/IP>
-
- -v Output verbose debug info
-
- -P <password> Password to decrypt your openssl encrpted device list.
-
+```
+Usage:  -f <dev_file> -d <path/folder> [options]...
+Options:
+  -h            This help text.
+  -d </Path/to/write/directory>
+                 Path to the directory to output files.
+  -f </path/to/device_file.lst>
+                 Input file. If \"-\", stdin will be used instead.
+  -i             Make individual files for each node in device list.
+  -l | -L        Show what will run from the device list.
+  -m             Connection mode serial|ip (default- serial)
+  -o <format>    Output format of written file
+                 node_exporter - For ingest by Prometheus node_exoprter.
+                 csv - [TODO] Create a comma delimited file.
+                 (Default- node_exporter)
+  -p <Device_port>|<HOST|IP>
+                 Device serial port, or IP. (default- /dev/ttyACM0)
+  -P <password>   Password for encrypted device file.
+  -t              Passive dwell time between polling each node.
+  -v              Show verbose output/debug
+  -H <URL>        HTTP endpoint to POST metrics to (e.g., http://pushgateway:9091/metrics/job/meshtastic)
+                  Metrics will be sent in Prometheus exposition format after each node collection.
+  -T <seconds>    HTTP timeout for curl requests (default: 10)
+  -A <header>     Additional HTTP header for curl (can be used multiple times)
+                  Example: -A "Authorization: Bearer token123"
+  --              Do not interpret any more arguments as options.
+  Device File format is CSV, Only the NodeID is required
+         NodeID,Contact_Name,LOCATION,LATITUDE,LONGITUDE
+```
 
 
 NOTE: Arguments required are -f <path/device.lst>  -p <serial_device>
@@ -138,7 +155,4 @@ openssl enc \
 ```
 
 TODO:
-- Make make the script run stand alone with interupt and PID.
-- Create Open-RC startup
-- Create systemd startup
-- Rewrite script in python to leaverage python meshtastic-cli.
+
