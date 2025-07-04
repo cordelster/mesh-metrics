@@ -1,3 +1,7 @@
+[![Built with Meshtasic](
+https://img.shields.io/badge/built%20with-Meshtastic-darkgreen)](
+https://github.com/meshtastic/python)
+
 # mesh_metrics.sh
 # Description
 This script allows interfacing directly with a Meshtastic node to poll repeaters for their status over the mesh network. It only requires a computer setup with ![Prometheus](https://prometheus.io/) or ![Victoria Metrics](https://victoriametrics.com), node_exporter (at this time), and a serial connection to a Meshtastic radio. It has no requirment for internet access.
