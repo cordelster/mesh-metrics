@@ -1,0 +1,51 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+.github
+
+# Documentation
+*.md
+!docker/homeassistant/README.md
+pics/
+SSH_when_FIPs_cyphers_dont_work.md
+MAC_NOTE.md
+
+# Development files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Prometheus files
+*.prom
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Config files (examples are included)
+*.conf
+!*.conf.example

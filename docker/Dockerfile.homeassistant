@@ -1,0 +1,51 @@
+# Dockerfile for Meshtastic Metrics Daemon
+# Home Assistant Add-on
+
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.11
+FROM ${BUILD_FROM}
+
+# Metadata
+LABEL io.hass.name="Meshtastic Metrics Daemon"
+LABEL io.hass.description="Monitor Meshtastic repeater telemetry and export to Prometheus"
+LABEL io.hass.type="addon"
+LABEL io.hass.version="0.98"
+LABEL maintainer="Corey DeLasaux <cordelster@gmail.com>"
+
+# Install system dependencies
+RUN apk add --no-cache \
+    bash \
+    curl \
+    tzdata
+
+# Copy and install Python dependencies
+COPY requirements.txt /tmp/requirements.txt
+RUN pip3 install --no-cache-dir -r /tmp/requirements.txt && \
+    rm /tmp/requirements.txt
+
+# Create application directory
+RUN mkdir -p /app
+
+# Copy application files
+COPY scripts/meshmetricsd.py /app/meshmetricsd.py
+COPY scripts/meshmetricsd.conf.example /app/meshmetricsd.conf.example
+COPY scripts/example.lst /app/example.lst
+
+# Make script executable
+RUN chmod +x /app/meshmetricsd.py
+
+# Copy Home Assistant specific files
+COPY docker/homeassistant/run.sh /run.sh
+RUN chmod +x /run.sh
+
+# Set working directory
+WORKDIR /app
+
+# Home Assistant uses /data for persistent storage
+VOLUME ["/data"]
+
+# Health check
+HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
+    CMD [ -f /var/run/meshmetricsd.pid ] || exit 1
+
+# Run script
+ENTRYPOINT ["/run.sh"]

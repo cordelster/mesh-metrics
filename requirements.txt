@@ -1,0 +1,14 @@
+# Python dependencies for Meshtastic Metrics Daemon
+
+# Core requirement: Meshtastic Python CLI
+# Provides meshtastic package with CLI and API functions
+meshtastic>=2.2.0
+
+# Optional but recommended: Encryption support for device files
+cryptography>=41.0.0
+
+# Standard library dependencies (included with Python 3.9+)
+# - configparser (built-in)
+# - argparse (built-in)
+# - logging (built-in)
+# - csv (built-in)
