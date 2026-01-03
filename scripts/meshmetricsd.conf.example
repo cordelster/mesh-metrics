@@ -6,7 +6,7 @@ poll_interval = 300
 log_level = INFO
 
 # Log file path
-log_file = /var/log/meshmetricsd.log
+log_file = /tmp/meshmetricsd.log
 
 # PID file path
 pid_file = /var/run/meshmetricsd.pid
@@ -17,17 +17,21 @@ group = meshtastic
 
 [meshtastic]
 # Connection mode: serial or ip
-mode = serial
+mode = ip
 
 # Device port (for serial) or IP address (for ip mode)
-port = /dev/ttyACM0
+port = 192.168.120.134
 
 # Time to wait between polling individual nodes (seconds)
 dwell_time = 10
 
+# Timeout for telemetry responses in seconds (default: 30)
+# With callback-based approach, you can use longer timeouts without blocking
+telemetry_timeout = 30
+
 [devices]
 # Path to devices CSV file
-file = /etc/meshtastic-telemetry/devices.csv
+file = ../../mesh_default.lst
 
 # Whether the device file is encrypted
 encrypted = false
@@ -37,7 +41,7 @@ password_file = /etc/meshtastic-telemetry/password
 
 [output]
 # Output directory for metrics files
-directory = /var/lib/node_exporter/textfile_collector
+directory = /tmp
 
 # Output format (currently only node_exporter supported)
 format = node_exporter
@@ -54,7 +58,7 @@ individual_files = true
 
 [monitoring]
 # Enable daemon statistics collection
-enable_stats = true
+enable_stats = false
 
 # Path to statistics file
 stats_file = /var/lib/meshmetricsd/stats.json

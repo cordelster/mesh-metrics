@@ -47,6 +47,7 @@ try:
     import meshtastic.serial_interface
     import meshtastic.tcp_interface
     from meshtastic import portnums_pb2, telemetry_pb2
+    from pubsub import pub
 except ImportError:
     print("Error: meshtastic package not found. Install with: pip install meshtastic, or your package manager.")
     sys.exit(1)
@@ -61,7 +62,7 @@ try:
 except ImportError:
     CRYPTO_AVAILABLE = False
 
-VERSION = "MTM-v0.98-Daemon"
+VERSION = "MTM-v1.00-Daemon"
 
 class DaemonConfig:
     """Configuration management for the daemon"""
@@ -82,7 +83,8 @@ class DaemonConfig:
         self.config['meshtastic'] = {
             'mode': 'serial',
             'port': '/dev/ttyACM0',
-            'dwell_time': '10'
+            'dwell_time': '10',
+            'telemetry_timeout': '30'  # Timeout in seconds for telemetry responses
         }
 
         self.config['devices'] = {
@@ -202,6 +204,9 @@ class MeshtasticTelemetryDaemon:
             'push_successful': 0,
             'push_failed': 0
         }
+        # Callback-based telemetry collection
+        self.pending_requests = {}  # {node_num: {'event': Event, 'data': {}, 'timestamp': float}}
+        self.request_lock = threading.Lock()
 
     def drop_privileges(self):
         """Drop privileges to specified user/group"""
@@ -435,6 +440,76 @@ class MeshtasticTelemetryDaemon:
 
         return devices
 
+    def telemetry_callback(self, packet, interface):
+        """Callback handler for incoming telemetry packets"""
+        try:
+            # Check if this is a telemetry packet
+            if 'decoded' not in packet:
+                return
+
+            decoded = packet.get('decoded', {})
+            portnum = decoded.get('portnum')
+
+            # Only process TELEMETRY_APP packets
+            if portnum != 'TELEMETRY_APP':
+                return
+
+            # Get the source node
+            from_id = packet.get('from')
+            if not from_id:
+                return
+
+            with self.request_lock:
+                # Check if we're waiting for telemetry from this node
+                if from_id not in self.pending_requests:
+                    self.logger.debug(f"Received unsolicited telemetry from node {from_id:08x}")
+                    return
+
+                request_info = self.pending_requests[from_id]
+
+                # Extract telemetry data from the packet
+                telemetry_data = {}
+
+                # Try to get device metrics
+                if 'telemetry' in decoded:
+                    telemetry = decoded['telemetry']
+
+                    if 'deviceMetrics' in telemetry:
+                        metrics = telemetry['deviceMetrics']
+                        if 'batteryLevel' in metrics:
+                            telemetry_data['Battery_level'] = metrics['batteryLevel']
+                        if 'voltage' in metrics:
+                            telemetry_data['Voltage'] = metrics['voltage']
+                        if 'channelUtilization' in metrics:
+                            telemetry_data['Total_channel_utilization'] = metrics['channelUtilization']
+                        if 'airUtilTx' in metrics:
+                            telemetry_data['Transmit_air_utilization'] = metrics['airUtilTx']
+                        if 'uptimeSeconds' in metrics:
+                            telemetry_data['uptime'] = metrics['uptimeSeconds']
+
+                    if 'environmentMetrics' in telemetry:
+                        env_metrics = telemetry['environmentMetrics']
+                        if 'temperature' in env_metrics:
+                            telemetry_data['temperature'] = env_metrics['temperature']
+                        if 'relativeHumidity' in env_metrics:
+                            telemetry_data['humidity'] = env_metrics['relativeHumidity']
+                        if 'barometricPressure' in env_metrics:
+                            telemetry_data['pressure'] = env_metrics['barometricPressure']
+
+                # Store the telemetry data
+                request_info['data'] = telemetry_data
+
+                # Signal that we received the data
+                request_info['event'].set()
+
+                if telemetry_data:
+                    self.logger.debug(f"Received telemetry from node {from_id:08x}: {list(telemetry_data.keys())}")
+                else:
+                    self.logger.debug(f"Received empty telemetry from node {from_id:08x}")
+
+        except Exception as e:
+            self.logger.error(f"Error in telemetry callback: {e}")
+
     def connect_to_meshtastic(self) -> bool:
         """Connect to Meshtastic device"""
         try:
@@ -449,6 +524,10 @@ class MeshtasticTelemetryDaemon:
                 self.logger.error(f"Invalid mode: {mode}")
                 return False
 
+            # Register callback for receiving telemetry packets
+            pub.subscribe(self.telemetry_callback, "meshtastic.receive")
+            self.logger.debug("Registered telemetry callback")
+
             self.logger.info(f"Connected to Meshtastic device via {mode} at {port}")
             return True
 
@@ -457,7 +536,7 @@ class MeshtasticTelemetryDaemon:
             return False
 
     def request_telemetry(self, node_id: str, timeout: int = 30) -> Dict:
-        """Request telemetry from a specific node"""
+        """Request telemetry from a specific node using callback-based approach"""
         if not self.interface:
             return {}
 
@@ -468,63 +547,65 @@ class MeshtasticTelemetryDaemon:
             else:
                 node_num = int(node_id, 16)
 
+            # Create a threading event for this request
+            request_event = threading.Event()
+
+            # Register pending request
+            with self.request_lock:
+                self.pending_requests[node_num] = {
+                    'event': request_event,
+                    'data': {},
+                    'timestamp': time.time()
+                }
+
             # Request telemetry
-            self.logger.debug(f"Requesting telemetry from node {node_num:08x}")
-            
-            # Send proper telemetry request using sendData with raw bytes
-            # Create an empty telemetry request (standard way to request telemetry)
-            self.interface.sendData(
-                data=b'',  # Empty payload requests telemetry
-                destinationId=node_num,
-                portNum=portnums_pb2.PortNum.TELEMETRY_APP,
-                wantAck=False,
-                wantResponse=True
-            )
-            
-            # Wait a bit for response to arrive
-            time.sleep(min(timeout, 15))  # Cap at 15 seconds to avoid blocking too long
-            
-            # Check if we have fresh telemetry data
-            node_info = self.interface.nodes.get(node_num, {})
-            
-            # Also check the nodedb for updated info
-            if hasattr(self.interface, 'nodesByNum') and node_num in self.interface.nodesByNum:
-                node_info = self.interface.nodesByNum[node_num]
+            self.logger.debug(f"Requesting telemetry from node {node_num:08x} with {timeout}s timeout")
 
-            # Extract telemetry data
+            try:
+                # Send telemetry request using sendData with raw bytes
+                # Create an empty telemetry request (standard way to request telemetry)
+                self.interface.sendData(
+                    data=b'',  # Empty payload requests telemetry
+                    destinationId=node_num,
+                    portNum=portnums_pb2.PortNum.TELEMETRY_APP,
+                    wantAck=False,
+                    wantResponse=True
+                )
+            except Exception as send_error:
+                self.logger.debug(f"Failed to send telemetry request to {node_id}: {send_error}")
+                # Clean up pending request
+                with self.request_lock:
+                    self.pending_requests.pop(node_num, None)
+                return {}
+
+            # Wait for callback to signal data arrival or timeout
+            received = request_event.wait(timeout=timeout)
+
+            # Retrieve the telemetry data
             telemetry_data = {}
-            if 'deviceMetrics' in node_info:
-                metrics = node_info['deviceMetrics']
-                if 'batteryLevel' in metrics:
-                    telemetry_data['Battery_level'] = metrics['batteryLevel']
-                if 'voltage' in metrics:
-                    telemetry_data['Voltage'] = metrics['voltage']
-                if 'channelUtilization' in metrics:
-                    telemetry_data['Total_channel_utilization'] = metrics['channelUtilization']
-                if 'airUtilTx' in metrics:
-                    telemetry_data['Transmit_air_utilization'] = metrics['airUtilTx']
-                if 'uptimeSeconds' in metrics:
-                    telemetry_data['uptime'] = metrics['uptimeSeconds']
+            with self.request_lock:
+                if node_num in self.pending_requests:
+                    telemetry_data = self.pending_requests[node_num]['data'].copy()
+                    # Clean up the pending request
+                    del self.pending_requests[node_num]
 
-            # Check for environment metrics
-            if 'environmentMetrics' in node_info:
-                env_metrics = node_info['environmentMetrics']
-                if 'temperature' in env_metrics:
-                    telemetry_data['temperature'] = env_metrics['temperature']
-                if 'relativeHumidity' in env_metrics:
-                    telemetry_data['humidity'] = env_metrics['relativeHumidity']
-                if 'barometricPressure' in env_metrics:
-                    telemetry_data['pressure'] = env_metrics['barometricPressure']
-            
-            if telemetry_data:
+            if received and telemetry_data:
                 self.logger.debug(f"Collected telemetry from {node_id}: {list(telemetry_data.keys())}")
+            elif received and not telemetry_data:
+                self.logger.debug(f"Received response from {node_id} but no telemetry data")
             else:
-                self.logger.debug(f"No telemetry data available for {node_id}")
+                self.logger.debug(f"Timeout waiting for telemetry from {node_id} after {timeout}s")
 
             return telemetry_data
 
         except Exception as e:
             self.logger.debug(f"Failed to get telemetry from {node_id}: {e}")
+            # Clean up pending request on error
+            try:
+                with self.request_lock:
+                    self.pending_requests.pop(node_num, None)
+            except:
+                pass
             return {}
 
     def format_prometheus_output(self, node_id: str, telemetry_data: Dict, device_info: Dict) -> List[str]:
@@ -726,6 +807,7 @@ class MeshtasticTelemetryDaemon:
         nodes_processed = 0
         nodes_successful = 0
         dwell_time = self.config.getint('meshtastic', 'dwell_time', 10)
+        telemetry_timeout = self.config.getint('meshtastic', 'telemetry_timeout', 30)
         all_output_lines = []
         individual_files = self.config.getboolean('output', 'individual_files')
 
@@ -738,8 +820,8 @@ class MeshtasticTelemetryDaemon:
 
             self.logger.debug(f"Processing node: {node_id}")
 
-            # Request telemetry
-            telemetry_data = self.request_telemetry(node_id, dwell_time)
+            # Request telemetry with configured timeout
+            telemetry_data = self.request_telemetry(node_id, telemetry_timeout)
 
             if telemetry_data:
                 nodes_successful += 1
@@ -851,11 +933,26 @@ class MeshtasticTelemetryDaemon:
 
     def cleanup(self):
         """Clean up resources"""
+        # Unsubscribe from callback
+        try:
+            pub.unsubscribe(self.telemetry_callback, "meshtastic.receive")
+            self.logger.debug("Unsubscribed telemetry callback")
+        except:
+            pass
+
+        # Signal all pending requests
+        with self.request_lock:
+            for node_num, request_info in self.pending_requests.items():
+                request_info['event'].set()
+            self.pending_requests.clear()
+
+        # Close interface
         if self.interface:
             try:
                 self.interface.close()
             except:
                 pass
+
         self.remove_pid_file()
 
 def main():
