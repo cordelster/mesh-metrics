@@ -17,7 +17,8 @@
 ##
 ########################
 
-VERSION="MTM-v0.98";
+
+VERSION="MTM-v1.00";
 RS=0;
 
 R1="^([0-9a-fA-F!]{9}),"
@@ -160,12 +161,18 @@ if [ ! -z "$HTTP_ENDPOINT" ] && [ ! -x $CURL ]; then
   fi
 fi
 
-if [ "${VERB}" -eq 1 ]; then
-  echo -ne "Contact: Corey DeLasaux <cordelster@gmail.com>\nVersion: ""$VERSION""\nCopyright 2023\n\n";
+debug() {
+    if [ "${VERB}" -eq 1 ]; then
+        echo -e "$@" >&2
+    fi
+}
+
+
+debug "Contact: Corey DeLasaux <cordelster@gmail.com>\nVersion: ""$VERSION""\nCopyright 2023\n\n";
   if [ ! -z "$HTTP_ENDPOINT" ]; then
-    echo "HTTP endpoint configured: $HTTP_ENDPOINT"
+    debug "HTTP endpoint configured: $HTTP_ENDPOINT"
   fi
-fi;
+
 ###
 
 
@@ -251,9 +258,9 @@ function send_http_metrics() {
         return 0
     fi
     
-    if [ "${VERB}" -eq 1 ]; then
-        echo "Sending metrics for node $node_id via HTTP ($status)"
-    fi
+
+debug "Sending metrics for node $node_id via HTTP ($status)"
+
     
     # Create temporary file for metrics
     local temp_file=$(mktemp)
@@ -313,16 +320,16 @@ function promnode() {
 
     for i in "${arr[@]}"
     do 
-      if [ "${VERB}" -eq 1 ]; then
-      echo $NODE " Raw variable:  " $i
-      fi;
+
+      debug $NODE " Raw variable:  " $i
+
 
       TELE=( $( echo $i | cut -d : -f 1 | sed -e 's/ /_/g' | awk '{$1=$1};1' ) )
       TELE+=( $( echo $i | cut -d : -f 2 | sed -e 's/[Vv%]$//g' | awk '{$1=$1};1' ) )
 
-      if [ "${VERB}" -eq 1 ]; then
-      echo $NODE "Filtered array: "${TELE[@]}
-      fi;
+
+      debug $NODE "Filtered array: "${TELE[@]}
+
 
         PNEX_INDEX=(meshtastic_"${TELE[0]}")
         if [[ ${TELE[1]} =~ ^[+-]?[0-9]+\.?[0-9]*$ ]]; then
@@ -330,7 +337,7 @@ function promnode() {
         else
         PNEX_OUTPUT=("${PNEX_INDEX}""{node=\""$NODE"\",str=\""${TELE[1]}"\"} 1")
         fi
-      if [ "${VERB}" -eq 1 ]; then echo "Node Exporter formated: "$PNEX_OUTPUT ${TELE[1]}; fi;
+      debug "Node Exporter formated: "$PNEX_OUTPUT ${TELE[1]}; 
       
       # Collect metrics for HTTP sending
       if [ ! -z "$HTTP_ENDPOINT" ]; then
@@ -341,16 +348,8 @@ function promnode() {
         fi
       fi
       
-        if [ -z "${DLST}" ]; then
-          echo $PNEX_OUTPUT;
-        else
-          if [ -z ${INDIV} ]; then
-          FILEOUT="${DLST}/meshtastic.prom"
-          else
-          FILEOUT="${DLST}/meshtastic-${NODEFILE}.prom"
-          fi
-          echo $PNEX_OUTPUT >> ${FILEOUT}.$$; #Maybe into array and return, handle write somewhere else
-        fi;
+          echo $PNEX_OUTPUT
+
 
   done
   
@@ -359,7 +358,7 @@ function promnode() {
 }
 
 function ocsv() {
-  echo "Not developed yet."
+  debug "Not developed yet."
   exit 1
 }
 
@@ -376,6 +375,12 @@ function invoke_telem() {
   if [ -f "$DLST" ]; then
   rm ${DLST}
   fi
+
+  # Initialize shared temp file if not in INDIV mode
+  if [ -z "${INDIV}" ] && [ ! -z "${DLST}" ]; then
+    FILEOUT="${DLST}/meshtastic.prom"
+    > "${FILEOUT}.$$"
+  fi
   if [ ${?} -eq 0 ]; then while read L; do if [[ ${L} =~ ${R1} ]]; then
   NODE="${BASH_REMATCH[1]}";
   PROP="${BASH_REMATCH[2]}";
@@ -384,54 +389,65 @@ function invoke_telem() {
   LONG="${BASH_REMATCH[5]}";
 
   
-  if [ "${VERB}" -eq 1 ]; then
-    echo -ne "\n\nVERSION: ""${VERSION}""\n\nNODE: ""${NODE}""\nCONTACT: ""${PROP}""\nLOCATION: ""${LOCA}""\nLATITUDE: ""${LATI}""\nLONGITUDE: ""${LONG}""\nUSER: ""${USER}""\n";
-  fi;
+
+  debug "\n\nVERSION: ""${VERSION}""\n\nNODE: ""${NODE}""\nCONTACT: ""${PROP}""\nLOCATION: ""${LOCA}""\nLATITUDE: ""${LATI}""\nLONGITUDE: ""${LONG}""\nUSER: ""${USER}""\n";
+
   
   if [ "${DOLS}" -eq 1 ]; then
     echo "${NODE}";
     continue;
-  fi;
+  fi
 
   if [ "${DOLS}" -eq 2 ]; then
     echo "${L}";
     continue;
-  fi;
+  fi
+
   NODEFILE=( $( echo $NODE | sed -e 's/\!//g' ) )
     array=()
   IFS=$'\n'
     array+=( $(${MESHTASTIC} $METHOD $PORT --request-telemetry --dest $NODE | grep -ahE "${GREPARGS}") );
-      if [ "${VERB}" -eq 1 ]; then
-        echo "${MESHTASTIC} $METHOD $PORT --request-telemetry --dest $NODE"
-      fi
-      
+
+        debug "${MESHTASTIC} $METHOD $PORT --request-telemetry --dest $NODE"
+
+
     local collection_success=0
   if [ ! -z "${array[2]}" ]; then
       (( count++ ))
       collection_success=1
       if [ ! -z $PROP ]; then array+=("Contact: ${PROP}"); fi
       if [ ! -z $LOCA ]; then array+=("Location: ${LOCA}"); fi
-    if [ ! -z $LATI ]; then array+=("Latitude: ${LATI}"); fi
-    if [ ! -z $LONG ]; then array+=("Longitude: ${LONG}"); fi
+      if [ ! -z $LATI ]; then array+=("Latitude: ${LATI}"); fi
+      if [ ! -z $LONG ]; then array+=("Longitude: ${LONG}"); fi
     array+=("up: ${VERSION}");
   else
     array+=("up: 0")
   fi
-  
-    for i in ${array[@]}
-    do 
-      if [ "${VERB}" -eq 1 ]; then
-      echo $NODE " Raw variable:  " $i
-      fi;
 
-  done
-  
+  # Set FILEOUT for INDIV mode (per node)
+  if [ ! -z "${INDIV}" ] && [ ! -z "${DLST}" ]; then
+    FILEOUT="${DLST}/meshtastic-${NODEFILE}.prom"
+  fi
+
+  # Process array with promnode to get formatted metrics
   local node_metrics=""
-      case $FORMAT in
-        node_exporter) node_metrics=$(promnode "${array[@]}");;
-                *) echo "Invalid option: -c $FORMAT"; usage >&2;exit 1;;
-    esac;
-    
+  case $FORMAT in
+    node_exporter) node_metrics=$(promnode "${array[@]}");;
+    *) echo "Invalid option: -c $FORMAT"; usage >&2;exit 1;;
+  esac;
+
+  # Write to file if DLST is set
+  if [ ! -z "${DLST}" ] && [ ! -z "$node_metrics" ]; then
+    if [ ! -z "${INDIV}" ]; then
+      # INDIV mode: write to individual node file
+      echo "$node_metrics" > "${FILEOUT}.$$"
+      mv "${FILEOUT}.$$" "${FILEOUT}"
+    else
+      # Shared mode: append to shared file
+      echo "$node_metrics" >> "${FILEOUT}.$$"
+    fi
+  fi
+
   # Send metrics via HTTP if endpoint is configured
   if [ ! -z "$HTTP_ENDPOINT" ] && [ ! -z "$node_metrics" ]; then
     if [ $collection_success -eq 1 ]; then
@@ -440,10 +456,9 @@ function invoke_telem() {
       send_http_metrics "$node_metrics" "$NODE" "failed"
     fi
   fi
-    
-if [ ! -z $INDIV ]; then
-if [ ! -z $DLST ]; then mv ${FILEOUT}.$$  ${FILEOUT}; fi
-fi
+
+
+
     wait $PDT 2>/dev/null
   
  
@@ -461,9 +476,11 @@ fi
     "${OPENSSL}" enc -in "${DEVFILE}" ${OPENSSL_OPT} -d -pass pass:"${DEVFILEPASS}"; \
   fi;) | grep -Ev "^( +)?#.*$|^$" | sort -u | sort -t@ -n);
 
-fi;
-if [ -z $INDIV ]; then
-if [ ! -z $DLST ]; then mv ${FILEOUT}.$$  ${FILEOUT}; fi
+  # Finalize shared file if not in INDIV mode
+  if [ -z "${INDIV}" ] && [ ! -z "${DLST}" ]; then
+    mv "${FILEOUT}.$$" "${FILEOUT}"
+  fi
+
 fi
 }
 
