@@ -1,0 +1,105 @@
+#!/sbin/openrc-run
+# Copyright 2023 Corey DeLasaux <cordelster@gmail.com>
+# Distributed under the terms of the GNU General Public License v3
+
+description="Meshtastic Repeater Telemetry Daemon"
+description_reload="Reload configuration"
+
+# Default configuration
+: ${MESHMETRICSD_USER:=root}
+: ${MESHMETRICSD_GROUP:=root}
+: ${MESHMETRICSD_CONFIG:=/etc/meshtastic-telemetry/meshmetricsd.conf}
+: ${MESHMETRICSD_PIDFILE:=/var/run/meshmetricsd.pid}
+: ${MESHMETRICSD_LOGFILE:=/var/log/meshmetricsd.log}
+
+# Command configuration
+command="/usr/local/bin/meshmetricsd.py"
+command_args="-c ${MESHMETRICSD_CONFIG} -p ${MESHMETRICSD_PIDFILE} -l ${MESHMETRICSD_LOGFILE}"
+pidfile="${MESHMETRICSD_PIDFILE}"
+
+# Add user/group if specified
+if [ -n "${MESHMETRICSD_USER}" ] && [ "${MESHMETRICSD_USER}" != "root" ]; then
+    command_args="${command_args} -u ${MESHMETRICSD_USER}"
+fi
+
+if [ -n "${MESHMETRICSD_GROUP}" ] && [ "${MESHMETRICSD_GROUP}" != "root" ]; then
+    command_args="${command_args} -g ${MESHMETRICSD_GROUP}"
+fi
+
+# Service dependencies
+depend() {
+    need net
+    use logger
+    after firewall
+}
+
+# Pre-start checks
+start_pre() {
+    # Check if Python 3 is available
+    if ! command -v python3 >/dev/null 2>&1; then
+        eerror "Python 3 is required but not found"
+        return 1
+    fi
+
+    # Check if the daemon script exists and is executable
+    if [ ! -x "${command}" ]; then
+        eerror "Daemon script not found or not executable: ${command}"
+        return 1
+    fi
+
+    # Check if config file exists
+    if [ ! -f "${MESHMETRICSD_CONFIG}" ]; then
+        ewarn "Configuration file not found: ${MESHMETRICSD_CONFIG}"
+        ewarn "Using default configuration"
+    fi
+
+    # Test configuration
+    if ! "${command}" -c "${MESHMETRICSD_CONFIG}" --test-config >/dev/null 2>&1; then
+        eerror "Configuration test failed"
+        eerror "Run: ${command} -c ${MESHMETRICSD_CONFIG} --test-config"
+        return 1
+    fi
+
+    # Create PID directory if needed
+    local piddir=$(dirname "${pidfile}")
+    if [ ! -d "${piddir}" ]; then
+        mkdir -p "${piddir}" || return 1
+        if [ -n "${MESHMETRICSD_USER}" ]; then
+            chown "${MESHMETRICSD_USER}:${MESHMETRICSD_GROUP}" "${piddir}" || return 1
+        fi
+    fi
+
+    # Create log directory if needed
+    if [ -n "${MESHMETRICSD_LOGFILE}" ]; then
+        local logdir=$(dirname "${MESHMETRICSD_LOGFILE}")
+        if [ ! -d "${logdir}" ]; then
+            mkdir -p "${logdir}" || return 1
+            if [ -n "${MESHMETRICSD_USER}" ]; then
+                chown "${MESHMETRICSD_USER}:${MESHMETRICSD_GROUP}" "${logdir}" || return 1
+            fi
+        fi
+    fi
+
+    # Ensure directories exist with correct permissions
+    checkpath --directory --mode 0755 --owner "${MESHMETRICSD_USER}:${MESHMETRICSD_GROUP}" \
+        /var/lib/meshtastic-telemetry \
+        /var/lib/node_exporter/textfile_collector 2>/dev/null || true
+}
+
+# Reload configuration
+reload() {
+    ebegin "Reloading ${RC_SVCNAME} configuration"
+
+    if [ ! -f "${pidfile}" ]; then
+        eerror "Service is not running"
+        eend 1
+        return 1
+    fi
+
+    # Send SIGHUP to reload configuration
+    kill -HUP $(cat "${pidfile}") 2>/dev/null
+    eend $?
+}
+
+# Extra commands
+extra_started_commands="reload"

@@ -1,0 +1,21 @@
+# Configuration for meshmetricsd OpenRC service
+
+# User to run the daemon as
+# Set to non-root user for better security (after creating the user)
+MESHMETRICSD_USER="root"
+
+# Group to run the daemon as
+MESHMETRICSD_GROUP="root"
+
+# Path to the configuration file
+MESHMETRICSD_CONFIG="/etc/meshtastic-telemetry/meshmetricsd.conf"
+
+# Path to the PID file
+MESHMETRICSD_PIDFILE="/var/run/meshmetricsd.pid"
+
+# Path to the log file
+MESHMETRICSD_LOGFILE="/var/log/meshmetricsd.log"
+
+# Additional command line options
+# (these are already set via config file, but can be overridden here)
+#MESHMETRICSD_OPTS=""
