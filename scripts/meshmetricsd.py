@@ -191,6 +191,12 @@ class MeshtasticTelemetryDaemon:
         self.running = False
         self.logger = None
         self.prometheus_exporter = None
+        # Cache for telemetry variants that meshtastic-python doesn't persist in
+        # interface.nodesByNum (environmentMetrics / powerMetrics / airQualityMetrics
+        # arrive via pubsub on every broadcast but are not stored per-node by the
+        # library). Indexed by from-node number; each value is a dict keyed by
+        # variant name with the latest payload.
+        self.telemetry_cache: Dict[int, Dict[str, Dict]] = {}
         self.stats = {
             'start_time': None,
             'last_poll': None,
@@ -435,6 +441,31 @@ class MeshtasticTelemetryDaemon:
 
         return devices
 
+    def _on_telemetry_recv(self, packet, interface):
+        """pubsub handler for incoming Meshtastic packets.
+
+        meshtastic-python persists deviceMetrics into nodesByNum but does NOT
+        persist environmentMetrics / powerMetrics / airQualityMetrics. We sniff
+        the raw stream and keep the latest payload per (node, variant) so the
+        normal poll path can pick them up.
+        """
+        try:
+            decoded = packet.get('decoded', {}) if isinstance(packet, dict) else {}
+            if decoded.get('portnum') != 'TELEMETRY_APP':
+                return
+            tel = decoded.get('telemetry', {})
+            from_node = packet.get('from')
+            if from_node is None:
+                return
+            node_cache = self.telemetry_cache.setdefault(from_node, {})
+            for variant in ('deviceMetrics', 'environmentMetrics', 'powerMetrics', 'airQualityMetrics'):
+                if variant in tel:
+                    node_cache[variant] = tel[variant]
+        except Exception as e:
+            # Never let a malformed packet kill the daemon
+            if self.logger:
+                self.logger.debug(f"Telemetry sniff error: {e}")
+
     def connect_to_meshtastic(self) -> bool:
         """Connect to Meshtastic device"""
         try:
@@ -448,6 +479,15 @@ class MeshtasticTelemetryDaemon:
             else:
                 self.logger.error(f"Invalid mode: {mode}")
                 return False
+
+            # Subscribe to incoming packets so we can capture variants the
+            # library doesn't cache (environment / power / air-quality).
+            try:
+                from pubsub import pub
+                pub.subscribe(self._on_telemetry_recv, 'meshtastic.receive')
+                self.logger.debug("Subscribed to meshtastic.receive for telemetry sniffing")
+            except ImportError:
+                self.logger.warning("pubsub not available — env/power metrics may be missed")
 
             self.logger.info(f"Connected to Meshtastic device via {mode} at {port}")
             return True
@@ -483,13 +523,23 @@ class MeshtasticTelemetryDaemon:
             
             # Wait a bit for response to arrive
             time.sleep(min(timeout, 15))  # Cap at 15 seconds to avoid blocking too long
-            
+
             # Check if we have fresh telemetry data
             node_info = self.interface.nodes.get(node_num, {})
-            
+
             # Also check the nodedb for updated info
             if hasattr(self.interface, 'nodesByNum') and node_num in self.interface.nodesByNum:
-                node_info = self.interface.nodesByNum[node_num]
+                node_info = dict(self.interface.nodesByNum[node_num])
+
+            # Merge variants we sniffed off the wire ourselves. The library
+            # persists deviceMetrics into nodesByNum at first sight and then
+            # leaves it stale (subsequent broadcasts don't update it);
+            # environmentMetrics / powerMetrics / airQualityMetrics never land
+            # there at all. The pubsub callback in _on_telemetry_recv keeps a
+            # fresh per-node copy of each variant — let it win over nodesByNum.
+            cached = self.telemetry_cache.get(node_num, {})
+            for variant, payload in cached.items():
+                node_info[variant] = payload
 
             # Extract telemetry data
             telemetry_data = {}
@@ -515,7 +565,25 @@ class MeshtasticTelemetryDaemon:
                     telemetry_data['humidity'] = env_metrics['relativeHumidity']
                 if 'barometricPressure' in env_metrics:
                     telemetry_data['pressure'] = env_metrics['barometricPressure']
-            
+
+            # Check for power metrics (INA219/INA226/INA260/INA3221 channels).
+            # Fields are emitted by the firmware only for channels the user wired,
+            # so each is gated independently.
+            if 'powerMetrics' in node_info:
+                power_metrics = node_info['powerMetrics']
+                if 'ch1Voltage' in power_metrics:
+                    telemetry_data['power_ch1_voltage'] = power_metrics['ch1Voltage']
+                if 'ch1Current' in power_metrics:
+                    telemetry_data['power_ch1_current'] = power_metrics['ch1Current']
+                if 'ch2Voltage' in power_metrics:
+                    telemetry_data['power_ch2_voltage'] = power_metrics['ch2Voltage']
+                if 'ch2Current' in power_metrics:
+                    telemetry_data['power_ch2_current'] = power_metrics['ch2Current']
+                if 'ch3Voltage' in power_metrics:
+                    telemetry_data['power_ch3_voltage'] = power_metrics['ch3Voltage']
+                if 'ch3Current' in power_metrics:
+                    telemetry_data['power_ch3_current'] = power_metrics['ch3Current']
+
             if telemetry_data:
                 self.logger.debug(f"Collected telemetry from {node_id}: {list(telemetry_data.keys())}")
             else:
