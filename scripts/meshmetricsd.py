@@ -448,6 +448,14 @@ class MeshtasticTelemetryDaemon:
         persist environmentMetrics / powerMetrics / airQualityMetrics. We sniff
         the raw stream and keep the latest payload per (node, variant) so the
         normal poll path can pick them up.
+
+        We MERGE incoming fields into the cached variant dict rather than
+        replacing the whole dict, so a packet that carries only a subset of
+        the fields (e.g. MessageToDict dropping zero-valued defaults, or a
+        partial decode after a malformed payload) does not erase the
+        previously-cached values for the missing fields. Sensors that publish
+        env_metrics with their full set every cycle behave identically; nodes
+        that emit incomplete variants stop oscillating in the gateway scrape.
         """
         try:
             decoded = packet.get('decoded', {}) if isinstance(packet, dict) else {}
@@ -459,8 +467,16 @@ class MeshtasticTelemetryDaemon:
                 return
             node_cache = self.telemetry_cache.setdefault(from_node, {})
             for variant in ('deviceMetrics', 'environmentMetrics', 'powerMetrics', 'airQualityMetrics'):
-                if variant in tel:
-                    node_cache[variant] = tel[variant]
+                incoming = tel.get(variant)
+                if not isinstance(incoming, dict):
+                    continue
+                existing = node_cache.setdefault(variant, {})
+                existing.update(incoming)
+                if self.logger and self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug(
+                        f"Cache merge {variant}@!{from_node:08x}: +{list(incoming.keys())} "
+                        f"-> {sorted(existing.keys())}"
+                    )
         except Exception as e:
             # Never let a malformed packet kill the daemon
             if self.logger:
