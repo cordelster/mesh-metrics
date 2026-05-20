@@ -110,6 +110,17 @@ class DaemonConfig:
             'stats_file': '/var/lib/meshtastic-telemetry/stats.json'
         }
 
+        # Optional sanity bounds for INA2xx/INA3221 power readings. All blank
+        # by default => no filtering (behaviour unchanged). When a bound is
+        # set, a reading outside it is dropped for that poll instead of being
+        # exported, keeping glitched I2C samples out of the time series.
+        self.config['power'] = {
+            'voltage_min': '',
+            'voltage_max': '',
+            'current_min': '',
+            'current_max': ''
+        }
+
     def load_config(self):
         """Load configuration from file"""
         if os.path.exists(self.config_file):
@@ -191,6 +202,12 @@ class MeshtasticTelemetryDaemon:
         self.running = False
         self.logger = None
         self.prometheus_exporter = None
+        # Cache for telemetry variants that meshtastic-python doesn't persist in
+        # interface.nodesByNum (environmentMetrics / powerMetrics / airQualityMetrics
+        # arrive via pubsub on every broadcast but are not stored per-node by the
+        # library). Indexed by from-node number; each value is a dict keyed by
+        # variant name with the latest payload.
+        self.telemetry_cache: Dict[int, Dict[str, Dict]] = {}
         self.stats = {
             'start_time': None,
             'last_poll': None,
@@ -435,6 +452,47 @@ class MeshtasticTelemetryDaemon:
 
         return devices
 
+    def _on_telemetry_recv(self, packet, interface):
+        """pubsub handler for incoming Meshtastic packets.
+
+        meshtastic-python persists deviceMetrics into nodesByNum but does NOT
+        persist environmentMetrics / powerMetrics / airQualityMetrics. We sniff
+        the raw stream and keep the latest payload per (node, variant) so the
+        normal poll path can pick them up.
+
+        We MERGE incoming fields into the cached variant dict rather than
+        replacing the whole dict, so a packet that carries only a subset of
+        the fields (e.g. MessageToDict dropping zero-valued defaults, or a
+        partial decode after a malformed payload) does not erase the
+        previously-cached values for the missing fields. Sensors that publish
+        env_metrics with their full set every cycle behave identically; nodes
+        that emit incomplete variants stop oscillating in the gateway scrape.
+        """
+        try:
+            decoded = packet.get('decoded', {}) if isinstance(packet, dict) else {}
+            if decoded.get('portnum') != 'TELEMETRY_APP':
+                return
+            tel = decoded.get('telemetry', {})
+            from_node = packet.get('from')
+            if from_node is None:
+                return
+            node_cache = self.telemetry_cache.setdefault(from_node, {})
+            for variant in ('deviceMetrics', 'environmentMetrics', 'powerMetrics', 'airQualityMetrics'):
+                incoming = tel.get(variant)
+                if not isinstance(incoming, dict):
+                    continue
+                existing = node_cache.setdefault(variant, {})
+                existing.update(incoming)
+                if self.logger and self.logger.isEnabledFor(logging.DEBUG):
+                    self.logger.debug(
+                        f"Cache merge {variant}@!{from_node:08x}: +{list(incoming.keys())} "
+                        f"-> {sorted(existing.keys())}"
+                    )
+        except Exception as e:
+            # Never let a malformed packet kill the daemon
+            if self.logger:
+                self.logger.debug(f"Telemetry sniff error: {e}")
+
     def connect_to_meshtastic(self) -> bool:
         """Connect to Meshtastic device"""
         try:
@@ -449,12 +507,46 @@ class MeshtasticTelemetryDaemon:
                 self.logger.error(f"Invalid mode: {mode}")
                 return False
 
+            # Subscribe to incoming packets so we can capture variants the
+            # library doesn't cache (environment / power / air-quality).
+            try:
+                from pubsub import pub
+                pub.subscribe(self._on_telemetry_recv, 'meshtastic.receive')
+                self.logger.debug("Subscribed to meshtastic.receive for telemetry sniffing")
+            except ImportError:
+                self.logger.warning("pubsub not available — env/power metrics may be missed")
+
             self.logger.info(f"Connected to Meshtastic device via {mode} at {port}")
             return True
 
         except Exception as e:
             self.logger.error(f"Failed to connect to Meshtastic device: {e}")
             return False
+
+    def _power_reading_ok(self, kind: str, value) -> bool:
+        """Range-check an INA power reading against the optional [power] config
+        bounds. `kind` is 'voltage' or 'current'; an empty bound is ignored.
+        Non-finite values and anything outside a configured bound return False
+        so the caller drops that field for this poll."""
+        try:
+            v = float(value)
+        except (TypeError, ValueError):
+            return False
+        if v != v or v in (float('inf'), float('-inf')):  # NaN / +-inf
+            return False
+        for key, is_min in ((f'{kind}_min', True), (f'{kind}_max', False)):
+            raw = (self.config.get('power', key, '') or '').strip()
+            if not raw:
+                continue
+            try:
+                limit = float(raw)
+            except ValueError:
+                continue
+            if is_min and v < limit:
+                return False
+            if not is_min and v > limit:
+                return False
+        return True
 
     def request_telemetry(self, node_id: str, timeout: int = 30) -> Dict:
         """Request telemetry from a specific node"""
@@ -483,13 +575,23 @@ class MeshtasticTelemetryDaemon:
             
             # Wait a bit for response to arrive
             time.sleep(min(timeout, 15))  # Cap at 15 seconds to avoid blocking too long
-            
+
             # Check if we have fresh telemetry data
             node_info = self.interface.nodes.get(node_num, {})
-            
+
             # Also check the nodedb for updated info
             if hasattr(self.interface, 'nodesByNum') and node_num in self.interface.nodesByNum:
-                node_info = self.interface.nodesByNum[node_num]
+                node_info = dict(self.interface.nodesByNum[node_num])
+
+            # Merge variants we sniffed off the wire ourselves. The library
+            # persists deviceMetrics into nodesByNum at first sight and then
+            # leaves it stale (subsequent broadcasts don't update it);
+            # environmentMetrics / powerMetrics / airQualityMetrics never land
+            # there at all. The pubsub callback in _on_telemetry_recv keeps a
+            # fresh per-node copy of each variant — let it win over nodesByNum.
+            cached = self.telemetry_cache.get(node_num, {})
+            for variant, payload in cached.items():
+                node_info[variant] = payload
 
             # Extract telemetry data
             telemetry_data = {}
@@ -515,7 +617,32 @@ class MeshtasticTelemetryDaemon:
                     telemetry_data['humidity'] = env_metrics['relativeHumidity']
                 if 'barometricPressure' in env_metrics:
                     telemetry_data['pressure'] = env_metrics['barometricPressure']
-            
+
+            # Check for power metrics (INA219/INA226/INA260/INA3221 channels).
+            # Fields are emitted by the firmware only for channels the user
+            # wired, so each is optional. Each reading is range-checked against
+            # the optional [power] config bounds; a glitched I2C sample outside
+            # the bounds is dropped instead of exported.
+            if 'powerMetrics' in node_info:
+                power_metrics = node_info['powerMetrics']
+                power_fields = (
+                    ('ch1Voltage', 'power_ch1_voltage', 'voltage'),
+                    ('ch1Current', 'power_ch1_current', 'current'),
+                    ('ch2Voltage', 'power_ch2_voltage', 'voltage'),
+                    ('ch2Current', 'power_ch2_current', 'current'),
+                    ('ch3Voltage', 'power_ch3_voltage', 'voltage'),
+                    ('ch3Current', 'power_ch3_current', 'current'),
+                )
+                for src, dst, kind in power_fields:
+                    if src not in power_metrics:
+                        continue
+                    value = power_metrics[src]
+                    if self._power_reading_ok(kind, value):
+                        telemetry_data[dst] = value
+                    else:
+                        self.logger.debug(
+                            f"Dropped out-of-range {dst}={value} from {node_id}")
+
             if telemetry_data:
                 self.logger.debug(f"Collected telemetry from {node_id}: {list(telemetry_data.keys())}")
             else:
