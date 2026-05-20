@@ -110,6 +110,17 @@ class DaemonConfig:
             'stats_file': '/var/lib/meshtastic-telemetry/stats.json'
         }
 
+        # Optional sanity bounds for INA2xx/INA3221 power readings. All blank
+        # by default => no filtering (behaviour unchanged). When a bound is
+        # set, a reading outside it is dropped for that poll instead of being
+        # exported, keeping glitched I2C samples out of the time series.
+        self.config['power'] = {
+            'voltage_min': '',
+            'voltage_max': '',
+            'current_min': '',
+            'current_max': ''
+        }
+
     def load_config(self):
         """Load configuration from file"""
         if os.path.exists(self.config_file):
@@ -512,6 +523,31 @@ class MeshtasticTelemetryDaemon:
             self.logger.error(f"Failed to connect to Meshtastic device: {e}")
             return False
 
+    def _power_reading_ok(self, kind: str, value) -> bool:
+        """Range-check an INA power reading against the optional [power] config
+        bounds. `kind` is 'voltage' or 'current'; an empty bound is ignored.
+        Non-finite values and anything outside a configured bound return False
+        so the caller drops that field for this poll."""
+        try:
+            v = float(value)
+        except (TypeError, ValueError):
+            return False
+        if v != v or v in (float('inf'), float('-inf')):  # NaN / +-inf
+            return False
+        for key, is_min in ((f'{kind}_min', True), (f'{kind}_max', False)):
+            raw = (self.config.get('power', key, '') or '').strip()
+            if not raw:
+                continue
+            try:
+                limit = float(raw)
+            except ValueError:
+                continue
+            if is_min and v < limit:
+                return False
+            if not is_min and v > limit:
+                return False
+        return True
+
     def request_telemetry(self, node_id: str, timeout: int = 30) -> Dict:
         """Request telemetry from a specific node"""
         if not self.interface:
@@ -583,22 +619,29 @@ class MeshtasticTelemetryDaemon:
                     telemetry_data['pressure'] = env_metrics['barometricPressure']
 
             # Check for power metrics (INA219/INA226/INA260/INA3221 channels).
-            # Fields are emitted by the firmware only for channels the user wired,
-            # so each is gated independently.
+            # Fields are emitted by the firmware only for channels the user
+            # wired, so each is optional. Each reading is range-checked against
+            # the optional [power] config bounds; a glitched I2C sample outside
+            # the bounds is dropped instead of exported.
             if 'powerMetrics' in node_info:
                 power_metrics = node_info['powerMetrics']
-                if 'ch1Voltage' in power_metrics:
-                    telemetry_data['power_ch1_voltage'] = power_metrics['ch1Voltage']
-                if 'ch1Current' in power_metrics:
-                    telemetry_data['power_ch1_current'] = power_metrics['ch1Current']
-                if 'ch2Voltage' in power_metrics:
-                    telemetry_data['power_ch2_voltage'] = power_metrics['ch2Voltage']
-                if 'ch2Current' in power_metrics:
-                    telemetry_data['power_ch2_current'] = power_metrics['ch2Current']
-                if 'ch3Voltage' in power_metrics:
-                    telemetry_data['power_ch3_voltage'] = power_metrics['ch3Voltage']
-                if 'ch3Current' in power_metrics:
-                    telemetry_data['power_ch3_current'] = power_metrics['ch3Current']
+                power_fields = (
+                    ('ch1Voltage', 'power_ch1_voltage', 'voltage'),
+                    ('ch1Current', 'power_ch1_current', 'current'),
+                    ('ch2Voltage', 'power_ch2_voltage', 'voltage'),
+                    ('ch2Current', 'power_ch2_current', 'current'),
+                    ('ch3Voltage', 'power_ch3_voltage', 'voltage'),
+                    ('ch3Current', 'power_ch3_current', 'current'),
+                )
+                for src, dst, kind in power_fields:
+                    if src not in power_metrics:
+                        continue
+                    value = power_metrics[src]
+                    if self._power_reading_ok(kind, value):
+                        telemetry_data[dst] = value
+                    else:
+                        self.logger.debug(
+                            f"Dropped out-of-range {dst}={value} from {node_id}")
 
             if telemetry_data:
                 self.logger.debug(f"Collected telemetry from {node_id}: {list(telemetry_data.keys())}")
